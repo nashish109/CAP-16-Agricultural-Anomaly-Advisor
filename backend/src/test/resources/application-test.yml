@@ -1,0 +1,29 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:agrisense_test;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH;DB_CLOSE_DELAY=-1
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+  task:
+    scheduling:
+      enabled: false
+
+jwt:
+  secret: AgriSenseTestSecretKeyMustBeAtLeast256BitsLongForHS256!!
+  expiration: 3600000
+
+agrisense:
+  cors:
+    allowed-origins: http://localhost:5173
+
+logging:
+  level:
+    com.agrisense: WARN
+    org.springframework.security: WARN

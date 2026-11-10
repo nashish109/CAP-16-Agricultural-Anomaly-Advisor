@@ -1,0 +1,68 @@
+# Dependencies
+node_modules/
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+
+# Build outputs
+dist/
+build/
+target/
+coverage/
+.next/
+
+# Environment files and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+secrets/
+credentials/
+service-account*.json
+
+# Python
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Java / Maven
+*.class
+
+# Local databases and database backups
+*.mv.db
+*.lock.db
+*.trace.db
+*.db
+*.sqlite
+*.sqlite3
+backend/data/
+backend/backups/
+
+# Local uploads and temporary test files
+backend/uploads/
+ai-service-pre-cap16-backup/
+ai-service/cap16_test.csv
+
+# Logs
+*.log
+logs/
+
+# IDE and editor
+.idea/
+.vscode/
+*.iml
+
+# Operating system
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+ai-service/cap16_invalid_area_test.csv

@@ -1,0 +1,23 @@
+package com.agrisense.dto;
+
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.time.Instant;
+
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class MarketPriceDto {
+
+    private Long id;
+    private String cropName;
+    private Double pricePerKg;
+    private String currency;
+    private Double changePercent;
+    private String market;
+    private Instant recordedAt;
+}

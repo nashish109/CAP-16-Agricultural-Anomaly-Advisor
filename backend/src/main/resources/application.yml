@@ -1,0 +1,41 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: agrisense-backend
+  datasource:
+    url: jdbc:postgresql://localhost:5432/agrisense
+    username: postgres
+    password: ${POSTGRES_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+        jdbc:
+          time_zone: UTC
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+
+jwt:
+  secret: ${JWT_SECRET:AgriSenseLocalDevSecretKeyMustBeAtLeast256BitsLongForHS256AlgorithmSecurity2024!}
+  expiration: 86400000
+
+agrisense:
+  ai-service-url: http://localhost:8000
+  weather:
+    default-location: Jaffna, Sri Lanka
+  cors:
+    allowed-origins: http://localhost:5173,http://localhost:5174
+
+logging:
+  level:
+    com.agrisense: INFO
+    org.springframework.security: WARN
