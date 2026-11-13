@@ -1,5 +1,11 @@
 
-import { useMemo } from 'react'
+import {
+  useEffect,
+  useMemo,
+  useState,
+  type ElementType,
+} from 'react'
+
 import {
   Database,
   CheckCircle2,
@@ -10,384 +16,848 @@ import {
   Copy,
   CalendarDays,
   BarChart3,
+  RefreshCw,
+  Loader2,
+  ChevronDown,
 } from 'lucide-react'
 
-type DatasetRecord = {
-  farm_id: string
-  plot_id: string
-  crop: string
-  season: string
-  soil_type: string
-  sowing_date: string
-  harvest_date: string
-  fertilizer_kg: number | null
-  seed_kg: number | null
-  water_liters: number | null
-  yield_tonnes_ha: number | null
+import {
+  dataQualityService,
+  type DataQualityReport,
+  type QualityRecord,
+} from '../services/dataQualityService'
+
+function formatNumber(value: number | null | undefined): string {
+  return Number(value ?? 0).toLocaleString()
 }
 
-const records: DatasetRecord[] = [
-  {
-    farm_id: 'F001', plot_id: 'P001', crop: 'Paddy',
-    season: 'Kharif', soil_type: 'Clay',
-    sowing_date: '2026-06-10', harvest_date: '2026-10-15',
-    fertilizer_kg: 120, seed_kg: 35, water_liters: 45000,
-    yield_tonnes_ha: 4.8,
-  },
-  {
-    farm_id: 'F001', plot_id: 'P002', crop: 'Maize',
-    season: 'Kharif', soil_type: 'Loamy',
-    sowing_date: '2026-06-12', harvest_date: '2026-10-20',
-    fertilizer_kg: 90, seed_kg: 25, water_liters: 32000,
-    yield_tonnes_ha: 3.9,
-  },
-  {
-    farm_id: 'F002', plot_id: 'P003', crop: 'Wheat',
-    season: 'Rabi', soil_type: 'Clay',
-    sowing_date: '2026-11-01', harvest_date: '2027-03-15',
-    fertilizer_kg: 110, seed_kg: 30, water_liters: 28000,
-    yield_tonnes_ha: 4.2,
-  },
-  {
-    farm_id: 'F002', plot_id: 'P004', crop: 'Paddy',
-    season: 'Kharif', soil_type: '',
-    sowing_date: '2026-06-15', harvest_date: '2026-10-18',
-    fertilizer_kg: 130, seed_kg: 32, water_liters: 48000,
-    yield_tonnes_ha: 5.1,
-  },
-  {
-    farm_id: 'F003', plot_id: 'P005', crop: 'Maize',
-    season: 'Kharif', soil_type: 'Loamy',
-    sowing_date: '2026-06-20', harvest_date: '2026-10-25',
-    fertilizer_kg: null, seed_kg: 28, water_liters: 35000,
-    yield_tonnes_ha: 4.0,
-  },
-  {
-    farm_id: 'F001', plot_id: 'P002', crop: 'Maize',
-    season: 'Kharif', soil_type: 'Loamy',
-    sowing_date: '2026-06-12', harvest_date: '2026-10-20',
-    fertilizer_kg: 90, seed_kg: 25, water_liters: 32000,
-    yield_tonnes_ha: 3.9,
-  },
-  {
-    farm_id: 'F003', plot_id: 'P006', crop: 'Wheat',
-    season: 'Rabi', soil_type: 'Clay',
-    sowing_date: '2026-11-05', harvest_date: '2026-03-10',
-    fertilizer_kg: -10, seed_kg: 30, water_liters: 26000,
-    yield_tonnes_ha: 4.1,
-  },
-  {
-    farm_id: 'F004', plot_id: 'P007', crop: 'Tomato',
-    season: 'Rabi', soil_type: 'Sandy',
-    sowing_date: '2026-11-10', harvest_date: '',
-    fertilizer_kg: 75, seed_kg: 12, water_liters: 18000,
-    yield_tonnes_ha: null,
-  },
-  {
-    farm_id: 'F004', plot_id: 'P008', crop: 'Chili',
-    season: 'Kharif', soil_type: 'Red',
-    sowing_date: '2026-06-08', harvest_date: '2026-10-10',
-    fertilizer_kg: 85, seed_kg: 15, water_liters: 20000,
-    yield_tonnes_ha: 2.8,
-  },
-]
+function formatDate(value: string | null | undefined): string {
+  if (!value) return '—'
 
-const fields: (keyof DatasetRecord)[] = [
-  'farm_id', 'plot_id', 'crop', 'season', 'soil_type',
-  'sowing_date', 'harvest_date', 'fertilizer_kg',
-  'seed_kg', 'water_liters', 'yield_tonnes_ha',
-]
+  const date = new Date(value)
 
-function isMissing(value: unknown) {
-  return value === null || value === undefined || value === ''
+  if (Number.isNaN(date.getTime())) return value
+
+  return date.toLocaleDateString()
 }
 
-function isValidDate(value: string) {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false
+function formatValue(
+  value: string | number | null | undefined
+): string {
+  if (value === null || value === undefined || value === '') {
+    return '—'
+  }
 
-  const [year, month, day] = value.split('-').map(Number)
+  return String(value)
+}
 
-  const date = new Date(Date.UTC(year, month - 1, day))
+function statusClass(status: string): string {
+  switch (status.toUpperCase()) {
+    case 'VALID':
+      return 'bg-emerald-50 text-emerald-700'
 
+    case 'INCOMPLETE':
+      return 'bg-amber-50 text-amber-700'
+
+    case 'DUPLICATE':
+      return 'bg-orange-50 text-orange-700'
+
+    default:
+      return 'bg-gray-100 text-gray-700'
+  }
+}
+
+function QualityCard({
+  label,
+  value,
+  description,
+  icon: Icon,
+  color,
+  background,
+}: {
+  label: string
+  value: string | number
+  description: string
+  icon: ElementType
+  color: string
+  background: string
+}) {
   return (
-    date.getUTCFullYear() === year &&
-    date.getUTCMonth() === month - 1 &&
-    date.getUTCDate() === day
+    <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+      <div className="flex items-center justify-between">
+        <p className="text-sm font-medium text-gray-500">
+          {label}
+        </p>
+
+        <div className={`rounded-lg p-2 ${background} ${color}`}>
+          <Icon size={20} />
+        </div>
+      </div>
+
+      <p className="mt-3 text-3xl font-bold text-gray-900">
+        {value}
+      </p>
+
+      <p className="mt-1 text-xs text-gray-500">
+        {description}
+      </p>
+    </div>
+  )
+}
+
+function RecordRow({ record }: { record: QualityRecord }) {
+  return (
+    <tr className="border-t border-gray-100 hover:bg-gray-50">
+      <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-700">
+        {record.farm_id}
+      </td>
+
+      <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-700">
+        {record.plot_id}
+      </td>
+
+      <td className="whitespace-nowrap px-4 py-3 text-sm font-medium text-gray-900">
+        {record.crop}
+      </td>
+
+      <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-700">
+        {record.season}
+      </td>
+
+      <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-700">
+        {formatValue(record.yield_tonnes_ha)}
+      </td>
+
+      <td className="whitespace-nowrap px-4 py-3">
+        <span
+          className={`rounded-full px-2.5 py-1 text-xs font-semibold ${statusClass(
+            record.quality_status
+          )}`}
+        >
+          {record.quality_status}
+        </span>
+      </td>
+
+      <td className="min-w-56 px-4 py-3 text-sm text-gray-600">
+        {record.quality_issues.length > 0 ? (
+          <ul className="list-inside list-disc space-y-1">
+            {record.quality_issues.map((issue, index) => (
+              <li key={`${record.record_id}-${index}`}>
+                {issue}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <span className="text-emerald-700">
+            No quality issues
+          </span>
+        )}
+      </td>
+
+      <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-500">
+        {record.source_file_name}
+      </td>
+    </tr>
   )
 }
 
 export default function DataQualityPage() {
-  const profile = useMemo(() => {
-    const totalCells = records.length * fields.length
-    const missingCells = records.reduce(
-      (sum, record) =>
-        sum + fields.filter(field => isMissing(record[field])).length,
-      0,
-    )
+  const [report, setReport] = useState<DataQualityReport | null>(null)
+  const [selectedBatchId, setSelectedBatchId] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [refreshCounter, setRefreshCounter] = useState(0)
 
-    const duplicateKeys = new Set<string>()
-    const duplicateRows = new Set<number>()
+  useEffect(() => {
+    let cancelled = false
 
-    records.forEach((record, index) => {
-      const key = JSON.stringify(record)
-      if (duplicateKeys.has(key)) duplicateRows.add(index)
-      duplicateKeys.add(key)
-    })
+    async function loadReport() {
+      try {
+        setError(null)
 
-    const invalidRows = records.filter(record => {
-      const invalidNumber =
-        [record.fertilizer_kg, record.seed_kg, record.water_liters,
-          record.yield_tonnes_ha].some(
-          value => value !== null && value !== undefined && value < 0,
+        if (report === null) {
+          setLoading(true)
+        } else {
+          setRefreshing(true)
+        }
+
+        const result = await dataQualityService.getReport(
+          selectedBatchId || undefined
         )
 
-      const invalidDate =
-        !isValidDate(record.sowing_date) ||
-        (record.harvest_date !== '' &&
-          !isValidDate(record.harvest_date)) ||
-        (record.harvest_date !== '' &&
-          isValidDate(record.sowing_date) &&
-          isValidDate(record.harvest_date) &&
-          record.harvest_date < record.sowing_date)
+        if (!cancelled) {
+          setReport(result)
+        }
+      } catch (err) {
+        if (!cancelled) {
+          const message =
+            err instanceof Error
+              ? err.message
+              : 'Unable to load agricultural quality data.'
 
-      return invalidNumber || invalidDate
-    })
-
-    const missingPercentage = (missingCells / totalCells) * 100
-    const duplicatePercentage = (duplicateRows.size / records.length) * 100
-    const invalidPercentage = (invalidRows.length / records.length) * 100
-
-    const score = Math.max(
-      0,
-      Math.round(100 - missingPercentage - duplicatePercentage - invalidPercentage),
-    )
-
-    return {
-      totalCells,
-      missingCells,
-      duplicateCount: duplicateRows.size,
-      invalidCount: invalidRows.length,
-      missingPercentage,
-      score,
+          setError(message)
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false)
+          setRefreshing(false)
+        }
+      }
     }
-  }, [])
 
-  const cropCounts = records.reduce<Record<string, number>>((acc, record) => {
-    acc[record.crop] = (acc[record.crop] || 0) + 1
-    return acc
-  }, {})
+    loadReport()
+
+    return () => {
+      cancelled = true
+    }
+  }, [selectedBatchId, refreshCounter])
+
+  const summary = report?.summary
+
+  const completeness = summary?.completeness_percentage ?? 0
+  const qualityScore = summary?.quality_score ?? 0
+
+  const cropDistribution = useMemo(
+    () => report?.crop_distribution ?? [],
+    [report]
+  )
+
+  const maxCropCount = Math.max(
+    1,
+    ...cropDistribution.map((item) => item.count)
+  )
+
+  const records = report?.records ?? []
 
   const qualityCards = [
     {
       label: 'Total Records',
-      value: records.length,
-      description: 'Agricultural records profiled',
+      value: formatNumber(summary?.total_records),
+      description: 'Persisted agricultural records',
       icon: Database,
       color: 'text-blue-600',
-      bg: 'bg-blue-50',
+      background: 'bg-blue-50',
     },
     {
       label: 'Missing Values',
-      value: profile.missingCells,
-      description: 'Empty or unavailable cells',
+      value: formatNumber(summary?.missing_values),
+      description: 'Missing values in nullable stored fields',
       icon: AlertTriangle,
       color: 'text-amber-600',
-      bg: 'bg-amber-50',
+      background: 'bg-amber-50',
     },
     {
       label: 'Duplicate Records',
-      value: profile.duplicateCount,
-      description: 'Repeated complete records',
+      value: formatNumber(summary?.duplicate_records),
+      description: 'Duplicate agricultural observations',
       icon: Copy,
       color: 'text-orange-600',
-      bg: 'bg-orange-50',
+      background: 'bg-orange-50',
     },
     {
-      label: 'Invalid Records',
-      value: profile.invalidCount,
-      description: 'Invalid values or date sequences',
+      label: 'Incomplete Records',
+      value: formatNumber(summary?.incomplete_records),
+      description: 'Records missing harvest or yield information',
       icon: XCircle,
       color: 'text-red-600',
-      bg: 'bg-red-50',
+      background: 'bg-red-50',
     },
   ]
 
-  return (
-    <div className="space-y-6 pb-8">
-      <div>
+  if (loading) {
+    return (
+      <div className="flex min-h-96 flex-col items-center justify-center gap-3">
+        <Loader2 className="animate-spin text-emerald-600" size={32} />
+
+        <p className="text-sm text-gray-500">
+          Loading agricultural quality information...
+        </p>
+      </div>
+    )
+  }
+
+  if (error && !report) {
+    return (
+      <div className="space-y-4 pb-8">
         <h1 className="text-2xl font-bold text-gray-900">
           Data Quality & Profiling
         </h1>
-        <p className="mt-1 text-gray-500">
-          Inspect agricultural datasets for completeness, consistency,
-          duplicates and invalid values.
-        </p>
-        <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700">
-          <Activity size={14} />
-          Synthetic demonstration dataset
+
+        <div className="rounded-xl border border-red-200 bg-red-50 p-5">
+          <div className="flex items-center gap-2 text-red-700">
+            <AlertTriangle size={20} />
+
+            <p className="font-semibold">
+              Unable to load quality report
+            </p>
+          </div>
+
+          <p className="mt-2 text-sm text-red-700">
+            {error}
+          </p>
+
+          <button
+            onClick={() => setRefreshCounter((count) => count + 1)}
+            className="mt-4 inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
+          >
+            <RefreshCw size={16} />
+            Retry
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  if (!report || report.batches.length === 0) {
+    return (
+      <div className="space-y-6 pb-8">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">
+            Data Quality & Profiling
+          </h1>
+
+          <p className="mt-1 text-gray-500">
+            Inspect agricultural datasets for completeness,
+            consistency and duplicate observations.
+          </p>
+        </div>
+
+        <div className="rounded-xl border border-gray-200 bg-white p-10 text-center">
+          <Database
+            size={42}
+            className="mx-auto text-gray-300"
+          />
+
+          <h2 className="mt-4 font-semibold text-gray-800">
+            No agricultural datasets found
+          </h2>
+
+          <p className="mt-2 text-sm text-gray-500">
+            Upload a CSV dataset to view its actual quality
+            statistics and record-level profiling.
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-6 pb-8">
+      {/* Page heading */}
+      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">
+            Data Quality & Profiling
+          </h1>
+
+          <p className="mt-1 text-gray-500">
+            Inspect agricultural datasets for completeness,
+            consistency, duplicates and quality issues.
+          </p>
+
+          <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">
+            <Activity size={14} />
+            Live Snowflake-backed agricultural data
+          </div>
+        </div>
+
+        <button
+          onClick={() => setRefreshCounter((count) => count + 1)}
+          disabled={refreshing}
+          className="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+        >
+          <RefreshCw
+            size={16}
+            className={refreshing ? 'animate-spin' : ''}
+          />
+          Refresh
+        </button>
+      </div>
+
+      {error && (
+        <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+          {error}
+        </div>
+      )}
+
+      {/* Batch selection */}
+      <div className="rounded-xl border border-gray-200 bg-white p-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-sm font-semibold text-gray-800">
+              Dataset selection
+            </p>
+
+            <p className="mt-1 text-xs text-gray-500">
+              Select an uploaded dataset or view all available batches.
+            </p>
+          </div>
+
+          <div className="relative min-w-0 sm:w-80">
+            <select
+              value={selectedBatchId}
+              onChange={(event) => setSelectedBatchId(event.target.value)}
+              className="w-full appearance-none rounded-lg border border-gray-200 bg-white px-3 py-2 pr-9 text-sm text-gray-700 outline-none focus:border-emerald-500"
+            >
+              <option value="">
+                All available datasets
+              </option>
+
+              {report.batches.map((batch) => (
+                <option
+                  key={batch.batch_id}
+                  value={batch.batch_id}
+                >
+                  {batch.source_file_name} — {batch.batch_id.slice(0, 8)}
+                </option>
+              ))}
+            </select>
+
+            <ChevronDown
+              size={16}
+              className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"
+            />
+          </div>
         </div>
       </div>
 
+      {/* Quality cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {qualityCards.map(card => {
-          const Icon = card.icon
-          return (
-            <div key={card.label} className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-medium text-gray-500">{card.label}</p>
-                <div className={`rounded-lg p-2 ${card.bg} ${card.color}`}>
-                  <Icon size={20} />
-                </div>
-              </div>
-              <p className="mt-3 text-3xl font-bold text-gray-900">
-                {card.value}
-              </p>
-              <p className="mt-1 text-xs text-gray-500">{card.description}</p>
-            </div>
-          )
-        })}
+        {qualityCards.map((card) => (
+          <QualityCard
+            key={card.label}
+            label={card.label}
+            value={card.value}
+            description={card.description}
+            icon={card.icon}
+            color={card.color}
+            background={card.background}
+          />
+        ))}
       </div>
 
+      {/* Quality score and checks */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="rounded-xl border border-gray-200 bg-white p-6 lg:col-span-1">
-          <h2 className="font-semibold text-gray-900">Overall Quality Score</h2>
+          <h2 className="font-semibold text-gray-900">
+            Overall Quality Score
+          </h2>
+
           <div className="mt-6 flex items-center justify-center">
             <div className="flex h-40 w-40 flex-col items-center justify-center rounded-full border-[12px] border-emerald-100">
               <span className="text-4xl font-bold text-emerald-700">
-                {profile.score}%
+                {qualityScore.toFixed(1)}%
               </span>
-              <span className="text-xs text-gray-500">Quality score</span>
+
+              <span className="text-xs text-gray-500">
+                Valid records
+              </span>
             </div>
           </div>
+
           <p className="mt-5 text-center text-sm text-gray-500">
-            Indicative score based on missing values, duplicate rows and
-            invalid records in this demonstration dataset.
+            Calculated as valid persisted records divided by
+            total persisted records.
           </p>
         </div>
 
         <div className="rounded-xl border border-gray-200 bg-white p-6 lg:col-span-2">
-          <h2 className="font-semibold text-gray-900">Data Quality Checks</h2>
+          <h2 className="font-semibold text-gray-900">
+            Data Quality Checks
+          </h2>
+
           <p className="mt-1 text-sm text-gray-500">
-            Results from the current demonstration dataset.
+            Quality measurements calculated from Snowflake records.
           </p>
 
           <div className="mt-5 space-y-5">
             <div>
               <div className="flex justify-between text-sm">
-                <span className="font-medium text-gray-700">Completeness</span>
+                <span className="font-medium text-gray-700">
+                  Nullable-field completeness
+                </span>
+
                 <span className="text-gray-500">
-                  {profile.totalCells - profile.missingCells}/{profile.totalCells} cells
+                  {completeness.toFixed(2)}%
                 </span>
               </div>
+
               <div className="mt-2 h-2 overflow-hidden rounded-full bg-gray-100">
                 <div
                   className="h-full rounded-full bg-emerald-500"
-                  style={{ width: `${100 - profile.missingPercentage}%` }}
+                  style={{
+                    width: `${Math.min(100, Math.max(0, completeness))}%`,
+                  }}
                 />
               </div>
+
+              <p className="mt-1 text-xs text-gray-500">
+                Based on {summary?.nullable_fields_checked ?? 0} nullable
+                fields in the persisted record schema.
+              </p>
             </div>
 
             <div className="flex items-center justify-between border-t border-gray-100 pt-4">
               <div className="flex items-center gap-3">
                 <CheckCircle2 className="text-emerald-600" size={20} />
+
                 <div>
-                  <p className="text-sm font-medium text-gray-800">Schema coverage</p>
-                  <p className="text-xs text-gray-500">11 expected columns</p>
+                  <p className="text-sm font-medium text-gray-800">
+                    CAP-16 schema reference
+                  </p>
+
+                  <p className="text-xs text-gray-500">
+                    Expected input fields
+                  </p>
                 </div>
               </div>
-              <span className="text-sm font-semibold text-emerald-700">Complete</span>
+
+              <span className="text-sm font-semibold text-emerald-700">
+                {report.schema.length} fields
+              </span>
             </div>
 
             <div className="flex items-center justify-between border-t border-gray-100 pt-4">
               <div className="flex items-center gap-3">
                 <AlertTriangle className="text-amber-600" size={20} />
+
                 <div>
-                  <p className="text-sm font-medium text-gray-800">Missing values</p>
-                  <p className="text-xs text-gray-500">Empty fields detected</p>
+                  <p className="text-sm font-medium text-gray-800">
+                    Missing nullable values
+                  </p>
+
+                  <p className="text-xs text-gray-500">
+                    Across persisted nullable fields
+                  </p>
                 </div>
               </div>
+
               <span className="text-sm font-semibold text-amber-700">
-                {profile.missingCells} found
+                {formatNumber(summary?.missing_values)} found
               </span>
             </div>
 
             <div className="flex items-center justify-between border-t border-gray-100 pt-4">
               <div className="flex items-center gap-3">
                 <Copy className="text-orange-600" size={20} />
+
                 <div>
-                  <p className="text-sm font-medium text-gray-800">Duplicate records</p>
-                  <p className="text-xs text-gray-500">Exact repeated rows</p>
+                  <p className="text-sm font-medium text-gray-800">
+                    Duplicate observations
+                  </p>
+
+                  <p className="text-xs text-gray-500">
+                    Duplicate status assigned by the processor
+                  </p>
                 </div>
               </div>
+
               <span className="text-sm font-semibold text-orange-700">
-                {profile.duplicateCount} found
+                {formatNumber(summary?.duplicate_records)} found
               </span>
             </div>
 
             <div className="flex items-center justify-between border-t border-gray-100 pt-4">
               <div className="flex items-center gap-3">
                 <CalendarDays className="text-red-600" size={20} />
+
                 <div>
-                  <p className="text-sm font-medium text-gray-800">Invalid records</p>
-                  <p className="text-xs text-gray-500">Numeric and date checks</p>
+                  <p className="text-sm font-medium text-gray-800">
+                    Incomplete observations
+                  </p>
+
+                  <p className="text-xs text-gray-500">
+                    Missing harvest date or crop yield
+                  </p>
                 </div>
               </div>
+
               <span className="text-sm font-semibold text-red-700">
-                {profile.invalidCount} found
+                {formatNumber(summary?.incomplete_records)} found
               </span>
             </div>
           </div>
         </div>
       </div>
 
+      {/* Crop distribution */}
       <div className="rounded-xl border border-gray-200 bg-white p-6">
         <div className="flex items-center gap-2">
           <BarChart3 className="text-emerald-600" size={20} />
-          <h2 className="font-semibold text-gray-900">Crop Distribution</h2>
+
+          <h2 className="font-semibold text-gray-900">
+            Crop Distribution
+          </h2>
         </div>
+
         <p className="mt-1 text-sm text-gray-500">
-          Number of records available for each crop.
+          Number of persisted agricultural records for each crop.
         </p>
 
-        <div className="mt-5 space-y-4">
-          {Object.entries(cropCounts).map(([crop, count]) => (
-            <div key={crop}>
-              <div className="mb-1 flex justify-between text-sm">
-                <span className="text-gray-700">{crop}</span>
-                <span className="font-medium text-gray-900">{count} records</span>
+        {cropDistribution.length === 0 ? (
+          <p className="mt-5 text-sm text-gray-500">
+            No crop distribution information is available.
+          </p>
+        ) : (
+          <div className="mt-5 space-y-4">
+            {cropDistribution.map((item) => (
+              <div key={item.crop}>
+                <div className="mb-1 flex justify-between text-sm">
+                  <span className="text-gray-700">
+                    {item.crop}
+                  </span>
+
+                  <span className="font-medium text-gray-900">
+                    {formatNumber(item.count)} records
+                  </span>
+                </div>
+
+                <div className="h-2 overflow-hidden rounded-full bg-gray-100">
+                  <div
+                    className="h-full rounded-full bg-emerald-600"
+                    style={{
+                      width: `${(item.count / maxCropCount) * 100}%`,
+                    }}
+                  />
+                </div>
               </div>
-              <div className="h-2 overflow-hidden rounded-full bg-gray-100">
-                <div
-                  className="h-full rounded-full bg-emerald-600"
-                  style={{ width: `${(count / records.length) * 100}%` }}
-                />
-              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Dataset history */}
+      <div className="rounded-xl border border-gray-200 bg-white p-6">
+        <div className="flex items-center gap-2">
+          <Database className="text-emerald-600" size={20} />
+
+          <h2 className="font-semibold text-gray-900">
+            Dataset History
+          </h2>
+        </div>
+
+        <p className="mt-1 text-sm text-gray-500">
+          Upload batches recorded in Snowflake.
+        </p>
+
+        <div className="mt-5 overflow-x-auto">
+          <table className="w-full min-w-[700px] text-left">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-4 py-3 text-xs font-semibold uppercase text-gray-500">
+                  File
+                </th>
+
+                <th className="px-4 py-3 text-xs font-semibold uppercase text-gray-500">
+                  Date
+                </th>
+
+                <th className="px-4 py-3 text-xs font-semibold uppercase text-gray-500">
+                  Total
+                </th>
+
+                <th className="px-4 py-3 text-xs font-semibold uppercase text-gray-500">
+                  Valid
+                </th>
+
+                <th className="px-4 py-3 text-xs font-semibold uppercase text-gray-500">
+                  Incomplete
+                </th>
+
+                <th className="px-4 py-3 text-xs font-semibold uppercase text-gray-500">
+                  Duplicates
+                </th>
+
+                <th className="px-4 py-3 text-xs font-semibold uppercase text-gray-500">
+                  Status
+                </th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {report.batches.map((batch) => (
+                <tr
+                  key={batch.batch_id}
+                  className="border-t border-gray-100"
+                >
+                  <td className="px-4 py-3 text-sm font-medium text-gray-800">
+                    {batch.source_file_name}
+                  </td>
+
+                  <td className="px-4 py-3 text-sm text-gray-600">
+                    {formatDate(batch.created_at)}
+                  </td>
+
+                  <td className="px-4 py-3 text-sm text-gray-700">
+                    {formatNumber(batch.total_records)}
+                  </td>
+
+                  <td className="px-4 py-3 text-sm text-emerald-700">
+                    {formatNumber(batch.valid_records)}
+                  </td>
+
+                  <td className="px-4 py-3 text-sm text-amber-700">
+                    {formatNumber(batch.incomplete_records)}
+                  </td>
+
+                  <td className="px-4 py-3 text-sm text-orange-700">
+                    {formatNumber(batch.duplicate_records)}
+                  </td>
+
+                  <td className="px-4 py-3 text-sm">
+                    <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+                      {batch.processing_status}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Individual record details */}
+      <div className="rounded-xl border border-gray-200 bg-white p-6">
+        <div className="flex items-center gap-2">
+          <FileSpreadsheet className="text-emerald-600" size={20} />
+
+          <h2 className="font-semibold text-gray-900">
+            Record-Level Quality Details
+          </h2>
+        </div>
+
+        <p className="mt-1 text-sm text-gray-500">
+          Individual persisted records and their quality classifications.
+        </p>
+
+        {report.records_truncated && (
+          <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+            Showing the first 5,000 records. Summary statistics
+            include all matching persisted records.
+          </div>
+        )}
+
+        {records.length === 0 ? (
+          <p className="mt-5 text-sm text-gray-500">
+            No persisted agricultural records are available.
+          </p>
+        ) : (
+          <div className="mt-5 overflow-x-auto">
+            <table className="w-full min-w-[1050px] text-left">
+              <thead className="bg-gray-50">
+                <tr>
+                  {[
+                    'Farm',
+                    'Plot',
+                    'Crop',
+                    'Season',
+                    'Yield (t/ha)',
+                    'Quality Status',
+                    'Quality Issues',
+                    'Source File',
+                  ].map((heading) => (
+                    <th
+                      key={heading}
+                      className="px-4 py-3 text-xs font-semibold uppercase text-gray-500"
+                    >
+                      {heading}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+
+              <tbody>
+                {records.map((record) => (
+                  <RecordRow
+                    key={record.record_id}
+                    record={record}
+                  />
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* CAP-16 schema reference */}
+      <div className="rounded-xl border border-gray-200 bg-white p-6">
+        <div className="flex items-center gap-2">
+          <FileSpreadsheet className="text-emerald-600" size={20} />
+
+          <h2 className="font-semibold text-gray-900">
+            CAP-16 Input Schema
+          </h2>
+        </div>
+
+        <p className="mt-1 text-sm text-gray-500">
+          Reference fields defined by the CropRecord validation model.
+          This is not a reconstruction of the original CSV headers.
+        </p>
+
+        <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {report.schema.map((field) => (
+            <div
+              key={field.name}
+              className="flex items-center justify-between gap-3 rounded-lg border border-gray-100 bg-gray-50 px-3 py-2"
+            >
+              <span className="break-all text-sm text-gray-700">
+                {field.name}
+              </span>
+
+              <span
+                className={`shrink-0 rounded-full px-2 py-1 text-xs font-medium ${
+                  field.required
+                    ? 'bg-blue-50 text-blue-700'
+                    : 'bg-gray-200 text-gray-600'
+                }`}
+              >
+                {field.required ? 'Required' : 'Optional'}
+              </span>
             </div>
           ))}
         </div>
       </div>
 
+      {/* Profiling summary */}
       <div className="rounded-xl border border-gray-200 bg-white p-6">
-        <div className="flex items-center gap-2">
-          <FileSpreadsheet className="text-emerald-600" size={20} />
-          <h2 className="font-semibold text-gray-900">Profiling Summary</h2>
-        </div>
+        <h2 className="font-semibold text-gray-900">
+          Profiling Summary
+        </h2>
+
         <p className="mt-1 text-sm text-gray-500">
-          Initial findings requiring attention before analytical processing.
+          Findings calculated from the selected Snowflake dataset.
         </p>
 
         <div className="mt-5 space-y-3 text-sm">
+          <div className="rounded-lg bg-emerald-50 p-4 text-emerald-900">
+            <strong>Valid records:</strong>{' '}
+            {formatNumber(summary?.valid_records)} observations passed
+            the processor's completeness and duplicate checks.
+          </div>
+
           <div className="rounded-lg bg-amber-50 p-4 text-amber-900">
-            <strong>Missing data:</strong> Soil type, fertilizer usage and
-            harvest information contain unavailable values.
+            <strong>Missing values:</strong>{' '}
+            {formatNumber(summary?.missing_values)} null values were found
+            across the five nullable stored fields.
           </div>
+
           <div className="rounded-lg bg-orange-50 p-4 text-orange-900">
-            <strong>Duplicates:</strong> An exact repeated agricultural record
-            was detected.
+            <strong>Duplicate observations:</strong>{' '}
+            {formatNumber(summary?.duplicate_records)} observations were
+            classified as duplicates by the processing engine.
           </div>
+
           <div className="rounded-lg bg-red-50 p-4 text-red-900">
-            <strong>Invalid data:</strong> Negative fertilizer usage and an
-            inconsistent sowing/harvest date sequence were detected.
+            <strong>Incomplete observations:</strong>{' '}
+            {formatNumber(summary?.incomplete_records)} observations
+            require harvest-date or yield information.
+          </div>
+
+          <div className="rounded-lg bg-gray-50 p-4 text-gray-700">
+            <strong>Rejected CSV rows:</strong> These are stored separately
+            in S3 and are not included in the persisted Snowflake record
+            statistics displayed here.
           </div>
         </div>
       </div>

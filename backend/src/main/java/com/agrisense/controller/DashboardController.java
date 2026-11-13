@@ -1,7 +1,10 @@
+
 package com.agrisense.controller;
 
 import com.agrisense.dto.ApiResponse;
+import com.agrisense.service.DashboardAnalyticsService;
 import com.agrisense.service.DashboardService;
+import com.fasterxml.jackson.databind.JsonNode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -16,9 +19,19 @@ import java.util.Map;
 public class DashboardController {
 
     private final DashboardService dashboardService;
+    private final DashboardAnalyticsService dashboardAnalyticsService;
 
     @GetMapping("/stats")
     public ResponseEntity<ApiResponse<Map<String, Object>>> stats() {
-        return ResponseEntity.ok(ApiResponse.ok(dashboardService.getStats()));
+        return ResponseEntity.ok(
+                ApiResponse.ok(dashboardService.getStats())
+        );
+    }
+
+    @GetMapping("/analytics")
+    public ResponseEntity<ApiResponse<JsonNode>> analytics() {
+        return ResponseEntity.ok(
+                ApiResponse.ok(dashboardAnalyticsService.getAnalytics())
+        );
     }
 }

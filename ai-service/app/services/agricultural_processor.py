@@ -27,18 +27,73 @@ def process_agricultural_dataset(
     dataframe = pd.DataFrame(records)
     total_records = len(dataframe)
 
-    # Normalize agricultural inputs by plot area.
+    # Step 1: Convert plot area into hectares.
+    area_factors = {
+        "hectares": 1.0,
+        "acres": 0.4046856422,
+    }
+
+    dataframe["area_hectares"] = (
+        dataframe["area_hectares"]
+        * dataframe["area_source_unit"].map(area_factors)
+    )
+
+    # Step 2: Convert fertilizer and seed quantities into kilograms.
+    weight_factors = {
+        "kg": 1.0,
+        "g": 0.001,
+        "tonnes": 1000.0,
+    }
+
+    dataframe["fertilizer_kg"] = (
+        dataframe["fertilizer_kg"]
+        * dataframe["fertilizer_source_unit"].map(weight_factors)
+    )
+
+    dataframe["seed_kg"] = (
+        dataframe["seed_kg"]
+        * dataframe["seed_source_unit"].map(weight_factors)
+    )
+
+    # Step 3: Convert water quantities into litres.
+    water_factors = {
+        "liters": 1.0,
+        "milliliters": 0.001,
+        "cubic_meters": 1000.0,
+    }
+
+    dataframe["water_liters"] = (
+        dataframe["water_liters"]
+        * dataframe["water_source_unit"].map(water_factors)
+    )
+
+    # Step 4: Derive yield when harvest weight is available.
+    # Yield (tonnes/hectare) = harvest weight (kg) / 1000 / area (ha).
+    missing_yield = dataframe["yield_tonnes_ha"].isna()
+    available_harvest_weight = dataframe["harvest_weight_kg"].notna()
+
+    derive_yield_mask = missing_yield & available_harvest_weight
+
+    dataframe.loc[derive_yield_mask, "yield_tonnes_ha"] = (
+        dataframe.loc[derive_yield_mask, "harvest_weight_kg"]
+        / 1000
+        / dataframe.loc[derive_yield_mask, "area_hectares"]
+    )
+
+    # Step 5: Calculate normalized input consumption per hectare.
     dataframe["fertilizer_kg_per_hectare"] = (
         dataframe["fertilizer_kg"] / dataframe["area_hectares"]
     )
+
     dataframe["seed_kg_per_hectare"] = (
         dataframe["seed_kg"] / dataframe["area_hectares"]
     )
+
     dataframe["water_liters_per_hectare"] = (
         dataframe["water_liters"] / dataframe["area_hectares"]
     )
 
-    # Identify missing information.
+    # Step 6: Identify missing information.
     missing_harvest = dataframe["harvest_date"].isna()
     missing_yield = dataframe["yield_tonnes_ha"].isna()
     incomplete_mask = missing_harvest | missing_yield
@@ -65,31 +120,32 @@ def process_agricultural_dataset(
         (~incomplete_mask & ~duplicate_mask).sum()
     )
 
-    # Exclude duplicate observations from aggregate averages.
-    analysis_dataframe = dataframe.loc[~duplicate_mask]
+    # Step 7: Calculate aggregate averages using only complete,
+    # non-duplicate records.
+    analysis_dataframe = dataframe.loc[
+        ~incomplete_mask & ~duplicate_mask
+    ].copy()
 
-    fertilizer_per_hectare_mean = float(
-        np.mean(
-            analysis_dataframe[
-                "fertilizer_kg_per_hectare"
-            ].to_numpy()
-        )
+    def calculate_mean(column: str) -> float:
+        """Calculate a mean safely, returning zero when no data exists."""
+
+        values = analysis_dataframe[column].dropna()
+
+        if values.empty:
+            return 0.0
+
+        return float(np.mean(values.to_numpy()))
+
+    fertilizer_per_hectare_mean = calculate_mean(
+        "fertilizer_kg_per_hectare"
     )
 
-    seed_per_hectare_mean = float(
-        np.mean(
-            analysis_dataframe[
-                "seed_kg_per_hectare"
-            ].to_numpy()
-        )
+    seed_per_hectare_mean = calculate_mean(
+        "seed_kg_per_hectare"
     )
 
-    water_per_hectare_mean = float(
-        np.mean(
-            analysis_dataframe[
-                "water_liters_per_hectare"
-            ].to_numpy()
-        )
+    water_per_hectare_mean = calculate_mean(
+        "water_liters_per_hectare"
     )
 
     available_yields = (
@@ -102,7 +158,7 @@ def process_agricultural_dataset(
         else None
     )
 
-    # Generate record-level quality and processed outputs.
+    # Step 8: Generate record-level quality and processed outputs.
     record_quality = []
     processed_records = []
 
@@ -140,10 +196,20 @@ def process_agricultural_dataset(
             )
         )
 
+        # Store canonical values while retaining source-unit labels.
         processed_record_data = records[index].copy()
 
         processed_record_data.update(
             {
+                "area_hectares": float(row["area_hectares"]),
+                "fertilizer_kg": float(row["fertilizer_kg"]),
+                "seed_kg": float(row["seed_kg"]),
+                "water_liters": float(row["water_liters"]),
+                "yield_tonnes_ha": (
+                    float(row["yield_tonnes_ha"])
+                    if pd.notna(row["yield_tonnes_ha"])
+                    else None
+                ),
                 "fertilizer_kg_per_hectare": float(
                     row["fertilizer_kg_per_hectare"]
                 ),
@@ -164,13 +230,14 @@ def process_agricultural_dataset(
             )
         )
 
-    # Generate processing summary.
+    # Step 9: Generate processing summary.
     message = (
         f"Processed {total_records} agricultural records. "
         f"{complete_records} complete records, "
         f"{incomplete_records} incomplete records, and "
         f"{duplicate_records} duplicate observations were identified. "
         f"{records_with_missing_harvest} records have missing harvest dates. "
+        f"Aggregate averages use complete, non-duplicate records only. "
         f"Average fertilizer consumption: "
         f"{fertilizer_per_hectare_mean:.2f} kg/ha; "
         f"average seed consumption: "

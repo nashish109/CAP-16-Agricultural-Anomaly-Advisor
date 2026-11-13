@@ -1,5 +1,6 @@
 
 import { NavLink, useNavigate } from 'react-router-dom'
+import { canAccessRoute } from '../config/permissions'
 import {
   LayoutDashboard,
   MapPinned,
@@ -39,8 +40,6 @@ const navGroups = [
   {
     label: 'CROP INTELLIGENCE',
     items: [
-      { to: '/crop-input-analysis', label: 'Crop Input Analysis', icon: Sprout },
-      { to: '/comparable-plots', label: 'Comparable Plot Analysis', icon: GitCompareArrows },
       { to: '/crop-predictions', label: 'Yield Anomaly Advisor', icon: ChartNoAxesCombined },
     ],
   },
@@ -68,6 +67,14 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
   const alertCount = useAlertCount()
+  const visibleNavGroups = navGroups
+  .map((group) => ({
+    ...group,
+    items: group.items.filter((item) =>
+      canAccessRoute(user?.role, item.to)
+    ),
+  }))
+  .filter((group) => group.items.length > 0)
 
   const handleLogout = () => {
     logout()
@@ -143,7 +150,7 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
             </NavLink>
           </div>
 
-          {navGroups.map((group) => (
+          {visibleNavGroups.map((group) => (
             <div key={group.label}>
               <p className="section-label mb-2 px-3">{group.label}</p>
 
@@ -187,7 +194,11 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
 
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-medium">{displayName}</p>
-              <p className="truncate text-[11px] text-white/45">Farmer</p>
+              <p className="truncate text-[11px] text-white/45">
+                {user?.role
+                  ? user.role.charAt(0) + user.role.slice(1).toLowerCase()
+                  : 'User'}
+              </p>
             </div>
           </div>
 

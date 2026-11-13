@@ -61,31 +61,56 @@ export default function App() {
                 }
               />
 
-              {/* Protected application */}
+              {/* Authenticated application */}
               <Route element={<ProtectedRoute />}>
                 <Route element={<DashboardLayout />}>
-                  <Route path="dashboard" element={<DashboardPage />} />
-                  <Route path="farms" element={<FarmsPage />} />
-                  <Route path="fields" element={<FieldsPage />} />
-                  <Route path="crop-management" element={<CropManagementPage />} />
 
-                  {/* CAP-16 Dataset Management */}
-                  <Route
-                    path="dataset-upload"
-                    element={<DatasetUploadPage />}
-                  />
+                  {/* Dashboard */}
+                  <Route element={<ProtectedRoute path="/dashboard" />}>
+                    <Route path="dashboard" element={<DashboardPage />} />
+                  </Route>
 
-                  {/* CAP-16 Data Quality */}
-                  <Route
-                    path="data-quality"
-                    element={<DataQualityPage />}
-                  />
+                  {/* Farm and crop management */}
+                  <Route element={<ProtectedRoute path="/farms" />}>
+                    <Route path="farms" element={<FarmsPage />} />
+                  </Route>
 
-                  {/* Existing routes retained */}
-                  <Route path="crop-predictions" element={<CropPredictionsPage />} />
-                  <Route path="alerts" element={<AlertsPage />} />
-                  <Route path="reports" element={<ReportsPage />} />
-                  <Route path="settings" element={<SettingsPage />} />
+                  <Route element={<ProtectedRoute path="/fields" />}>
+                    <Route path="fields" element={<FieldsPage />} />
+                  </Route>
+
+                  <Route element={<ProtectedRoute path="/crop-management" />}>
+                    <Route path="crop-management" element={<CropManagementPage />} />
+                  </Route>
+
+                  {/* Dataset management */}
+                  <Route element={<ProtectedRoute path="/dataset-upload" />}>
+                    <Route path="dataset-upload" element={<DatasetUploadPage />} />
+                  </Route>
+
+                  <Route element={<ProtectedRoute path="/data-quality" />}>
+                    <Route path="data-quality" element={<DataQualityPage />} />
+                  </Route>
+
+                  {/* Crop intelligence */}
+                  <Route element={<ProtectedRoute path="/crop-predictions" />}>
+                    <Route path="crop-predictions" element={<CropPredictionsPage />} />
+                  </Route>
+
+                  {/* Analytics and reporting */}
+                  <Route element={<ProtectedRoute path="/alerts" />}>
+                    <Route path="alerts" element={<AlertsPage />} />
+                  </Route>
+
+                  <Route element={<ProtectedRoute path="/reports" />}>
+                    <Route path="reports" element={<ReportsPage />} />
+                  </Route>
+
+                  {/* Account settings */}
+                  <Route element={<ProtectedRoute path="/settings" />}>
+                    <Route path="settings" element={<SettingsPage />} />
+                  </Route>
+
                 </Route>
               </Route>
 

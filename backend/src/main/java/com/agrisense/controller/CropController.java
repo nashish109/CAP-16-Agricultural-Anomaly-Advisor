@@ -1,3 +1,4 @@
+
 package com.agrisense.controller;
 
 import com.agrisense.dto.ApiResponse;
@@ -8,6 +9,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -27,29 +29,60 @@ public class CropController {
 
     private final CropService cropService;
 
+    // Farmers, analysts and admins can view crops
     @GetMapping
-    public ResponseEntity<ApiResponse<List<CropDto>>> getAll(@RequestParam(required = false) Long fieldId) {
-        return ResponseEntity.ok(ApiResponse.ok(cropService.findAll(fieldId)));
+    @PreAuthorize("hasAnyRole('FARMER', 'ANALYST', 'ADMIN')")
+    public ResponseEntity<ApiResponse<List<CropDto>>> getAll(
+            @RequestParam(required = false) Long fieldId) {
+
+        return ResponseEntity.ok(
+                ApiResponse.ok(cropService.findAll(fieldId)));
     }
 
+    // View an individual crop
     @GetMapping("/{id}")
-    public ResponseEntity<ApiResponse<CropDto>> getById(@PathVariable Long id) {
-        return ResponseEntity.ok(ApiResponse.ok(cropService.findById(id)));
+    @PreAuthorize("hasAnyRole('FARMER', 'ANALYST', 'ADMIN')")
+    public ResponseEntity<ApiResponse<CropDto>> getById(
+            @PathVariable Long id) {
+
+        return ResponseEntity.ok(
+                ApiResponse.ok(cropService.findById(id)));
     }
 
+    // Farmers and admins can create crops
     @PostMapping
-    public ResponseEntity<ApiResponse<CropDto>> create(@Valid @RequestBody CropDto dto) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.ok("Crop created", cropService.create(dto)));
+    @PreAuthorize("hasAnyRole('FARMER', 'ADMIN')")
+    public ResponseEntity<ApiResponse<CropDto>> create(
+            @Valid @RequestBody CropDto dto) {
+
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.ok(
+                        "Crop created",
+                        cropService.create(dto)));
     }
 
+    // Farmers and admins can update crops
     @PutMapping("/{id}")
-    public ResponseEntity<ApiResponse<CropDto>> update(@PathVariable Long id, @Valid @RequestBody CropDto dto) {
-        return ResponseEntity.ok(ApiResponse.ok("Crop updated", cropService.update(id, dto)));
+    @PreAuthorize("hasAnyRole('FARMER', 'ADMIN')")
+    public ResponseEntity<ApiResponse<CropDto>> update(
+            @PathVariable Long id,
+            @Valid @RequestBody CropDto dto) {
+
+        return ResponseEntity.ok(
+                ApiResponse.ok(
+                        "Crop updated",
+                        cropService.update(id, dto)));
     }
 
+    // Farmers and admins can delete crops
     @DeleteMapping("/{id}")
-    public ResponseEntity<ApiResponse<MessageResponse>> delete(@PathVariable Long id) {
+    @PreAuthorize("hasAnyRole('FARMER', 'ADMIN')")
+    public ResponseEntity<ApiResponse<MessageResponse>> delete(
+            @PathVariable Long id) {
+
         cropService.delete(id);
-        return ResponseEntity.ok(ApiResponse.ok(new MessageResponse("Crop deleted")));
+
+        return ResponseEntity.ok(
+                ApiResponse.ok(new MessageResponse("Crop deleted")));
     }
 }

@@ -1,3 +1,4 @@
+
 export type FieldStatus = 'HEALTHY' | 'MODERATE' | 'ATTENTION'
 export type AlertSeverity = 'CRITICAL' | 'WARNING' | 'INFO' | 'SUCCESS'
 export type IrrigationStatus = 'PENDING' | 'RUNNING' | 'COMPLETED'
@@ -104,6 +105,51 @@ export interface Alert {
   timestamp: string
 }
 
+
+// CAP-16: Snowflake-backed anomaly assessments
+
+export interface AnomalyBatch {
+  batch_id: string
+  source_file_name: string
+  processing_status: string
+  total_records: number
+  created_at: string | null
+}
+
+export interface AnomalyAssessment {
+  anomaly_id: string
+  batch_id: string
+  record_id: string
+  farm_id: string
+  plot_id: string
+  crop: string
+  season: string
+  soil_type: string
+  anomaly_type: string
+  metric_name: string
+  observed_value: number | null
+  expected_value: number | null
+  deviation_percentage: number | null
+  severity: 'HIGH' | 'MEDIUM' | 'INFO'
+  explanation: string
+  detected_at: string | null
+  source_file_name: string
+}
+
+export interface AnomalyBatchResponse {
+  success: boolean
+  role: string
+  data: AnomalyBatch[]
+}
+
+export interface AnomalyAssessmentResponse {
+  success: boolean
+  role: string
+  batch_id: string | null
+  total_assessments: number
+  data: AnomalyAssessment[]
+}
+
 export interface DashboardStats {
   totalFarms: number
   farmsChangePercent: number
@@ -116,6 +162,74 @@ export interface DashboardStats {
   pendingTasks: number
   totalArea: number
   activeSensors: number
+}
+
+// CAP-16: Snowflake-backed dashboard analytics
+
+export interface DashboardDatasetAnalytics {
+  total_datasets: number
+  total_records: number
+  valid_records: number
+  complete_records: number
+  incomplete_records: number
+  duplicate_records: number
+  missing_harvest_records: number
+  missing_yield_records: number
+  avg_fertilizer_kg_per_hectare: number | null
+  avg_seed_kg_per_hectare: number | null
+  avg_water_liters_per_hectare: number | null
+}
+
+export interface DashboardRecordAnalytics {
+  total_agricultural_records: number
+  valid_quality_records: number
+  non_valid_quality_records: number
+  avg_yield_tonnes_ha: number | null
+  avg_fertilizer_kg_per_hectare: number | null
+  avg_seed_kg_per_hectare: number | null
+  avg_water_liters_per_hectare: number | null
+}
+
+export interface DashboardAnomalyDistribution {
+  severity: string
+  anomaly_type: string
+  anomaly_count: number
+}
+
+export interface DashboardRecentDataset {
+  batch_id: string
+  source_file_name: string
+  processing_status: string
+  total_records: number
+  valid_records: number
+  incomplete_records: number
+  duplicate_records: number
+  created_at: string | null
+}
+
+export interface DashboardRecentAnomaly {
+  anomaly_id: string
+  batch_id: string
+  farm_id: string
+  plot_id: string
+  crop: string
+  season: string
+  anomaly_type: string
+  metric_name: string
+  observed_value: number | null
+  expected_value: number | null
+  deviation_percentage: number | null
+  severity: string
+  explanation: string
+  detected_at: string | null
+}
+
+export interface DashboardAnalytics {
+  datasets: DashboardDatasetAnalytics
+  records: DashboardRecordAnalytics
+  anomaly_distribution: DashboardAnomalyDistribution[]
+  recent_datasets: DashboardRecentDataset[]
+  recent_anomalies: DashboardRecentAnomaly[]
 }
 
 export interface DiseaseDetectionResult {

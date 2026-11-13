@@ -8,7 +8,9 @@ import {
   X,
   Database,
   ClipboardCheck,
+  Loader2,
 } from 'lucide-react'
+import { api, getApiErrorMessage } from '../services/api'
 
 const requiredColumns = [
   'farm_id',
@@ -16,12 +18,11 @@ const requiredColumns = [
   'crop',
   'season',
   'soil_type',
+  'area_hectares',
   'sowing_date',
-  'harvest_date',
   'fertilizer_kg',
   'seed_kg',
   'water_liters',
-  'yield_tonnes_ha',
 ]
 
 interface ValidationResult {
@@ -64,10 +65,15 @@ export default function DatasetUploadPage() {
   const [file, setFile] = useState<File | null>(null)
   const [validation, setValidation] = useState<ValidationResult | null>(null)
   const [processing, setProcessing] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const [uploadError, setUploadError] = useState('')
+  const [uploadResult, setUploadResult] = useState<unknown>(null)
 
   const handleFile = (selectedFile?: File) => {
     setValidation(null)
     setFile(null)
+    setUploadError('')
+    setUploadResult(null)
 
     if (!selectedFile) return
 
@@ -156,9 +162,33 @@ export default function DatasetUploadPage() {
     reader.readAsText(selectedFile)
   }
 
+  const uploadDataset = async () => {
+    if (!file || !validation?.valid || uploading) return
+
+    setUploading(true)
+    setUploadError('')
+    setUploadResult(null)
+
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+
+      const response = await api.post('/datasets/upload', formData)
+      setUploadResult(response.data)
+    } catch (error) {
+      setUploadError(
+        getApiErrorMessage(error, 'Dataset upload failed. Please try again.'),
+      )
+    } finally {
+      setUploading(false)
+    }
+  }
+
   const clearFile = () => {
     setFile(null)
     setValidation(null)
+    setUploadError('')
+    setUploadResult(null)
   }
 
   return (
@@ -173,7 +203,6 @@ export default function DatasetUploadPage() {
         </p>
       </div>
 
-      {/* Upload overview */}
       <div className="grid gap-4 sm:grid-cols-3">
         <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
           <FileSpreadsheet className="mb-3 text-emerald-600" size={23} />
@@ -200,7 +229,6 @@ export default function DatasetUploadPage() {
         </div>
       </div>
 
-      {/* File selection */}
       <section className="rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
         <h2 className="text-lg font-semibold text-gray-900">
           Select Agricultural Dataset
@@ -226,6 +254,7 @@ export default function DatasetUploadPage() {
             type="file"
             accept=".csv,text/csv"
             className="hidden"
+            disabled={uploading}
             onChange={(event) => handleFile(event.target.files?.[0])}
           />
         </label>
@@ -247,7 +276,8 @@ export default function DatasetUploadPage() {
             <button
               type="button"
               onClick={clearFile}
-              className="rounded-lg p-2 text-gray-500 hover:bg-gray-100"
+              disabled={uploading}
+              className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 disabled:opacity-50"
               aria-label="Remove selected file"
             >
               <X size={18} />
@@ -262,11 +292,13 @@ export default function DatasetUploadPage() {
         )}
 
         {validation && (
-          <div className={`mt-4 rounded-lg border p-4 ${
-            validation.valid
-              ? 'border-emerald-200 bg-emerald-50'
-              : 'border-red-200 bg-red-50'
-          }`}>
+          <div
+            className={`mt-4 rounded-lg border p-4 ${
+              validation.valid
+                ? 'border-emerald-200 bg-emerald-50'
+                : 'border-red-200 bg-red-50'
+            }`}
+          >
             <div className="flex items-center gap-2">
               {validation.valid ? (
                 <CheckCircle2 className="text-emerald-700" size={20} />
@@ -308,15 +340,58 @@ export default function DatasetUploadPage() {
             )}
           </div>
         )}
+
+        {validation?.valid && file && (
+          <button
+            type="button"
+            onClick={uploadDataset}
+            disabled={uploading}
+            className="mt-5 flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-600 px-5 py-3 font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {uploading ? (
+              <>
+                <Loader2 size={19} className="animate-spin" />
+                Uploading and processing...
+              </>
+            ) : (
+              <>
+                <Upload size={19} />
+                Upload and Process Dataset
+              </>
+            )}
+          </button>
+        )}
+
+        {uploadError && (
+          <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+            <div className="flex items-center gap-2 font-semibold">
+              <AlertTriangle size={19} />
+              Upload failed
+            </div>
+            <p className="mt-2">{uploadError}</p>
+          </div>
+        )}
+
+        {uploadResult !== null && (
+          <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 p-4">
+            <div className="flex items-center gap-2 font-semibold text-emerald-800">
+              <CheckCircle2 size={20} />
+              Dataset successfully submitted for processing
+            </div>
+            <pre className="mt-3 max-h-80 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-white p-3 text-xs text-gray-700">
+              {JSON.stringify(uploadResult, null, 2)}
+            </pre>
+          </div>
+        )}
       </section>
 
-      {/* Required schema */}
       <section className="rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
         <h2 className="text-lg font-semibold text-gray-900">
           Required CSV Schema
         </h2>
         <p className="mt-1 text-sm text-gray-500">
-          Your dataset should contain the following columns.
+          Your dataset should contain the following required columns.
+          Harvest date and yield are optional.
         </p>
 
         <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
@@ -331,7 +406,6 @@ export default function DatasetUploadPage() {
         </div>
       </section>
 
-      {/* Preview */}
       {validation?.headers.length ? (
         <section className="rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
           <div className="mb-4">
@@ -339,7 +413,8 @@ export default function DatasetUploadPage() {
               Dataset Preview
             </h2>
             <p className="mt-1 text-sm text-gray-500">
-              Showing up to the first five records. Total records: {validation.recordCount}.
+              Showing up to the first five records. Total records:{' '}
+              {validation.recordCount}.
             </p>
           </div>
 
@@ -348,7 +423,10 @@ export default function DatasetUploadPage() {
               <thead className="bg-gray-50 text-gray-600">
                 <tr>
                   {validation.headers.map((header, index) => (
-                    <th key={`${header}-${index}`} className="whitespace-nowrap px-3 py-3">
+                    <th
+                      key={`${header}-${index}`}
+                      className="whitespace-nowrap px-3 py-3"
+                    >
                       {header}
                     </th>
                   ))}
@@ -373,13 +451,6 @@ export default function DatasetUploadPage() {
           </div>
         </section>
       ) : null}
-
-      <div className="rounded-lg border border-sky-200 bg-sky-50 p-4 text-sm text-sky-800">
-        <strong>Current implementation stage:</strong> Local CSV selection,
-        structural validation and preview are available. Server upload,
-        S3 storage and Python analytics processing will be connected in
-        the backend integration phase.
-      </div>
     </div>
   )
 }

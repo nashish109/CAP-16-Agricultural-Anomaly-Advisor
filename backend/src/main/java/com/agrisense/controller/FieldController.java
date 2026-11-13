@@ -1,3 +1,4 @@
+
 package com.agrisense.controller;
 
 import com.agrisense.dto.ApiResponse;
@@ -8,6 +9,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -27,29 +29,60 @@ public class FieldController {
 
     private final FieldService fieldService;
 
+    // Farmers, analysts and admins can view fields
     @GetMapping
-    public ResponseEntity<ApiResponse<List<FieldDto>>> getAll(@RequestParam(required = false) Long farmId) {
-        return ResponseEntity.ok(ApiResponse.ok(fieldService.findAll(farmId)));
+    @PreAuthorize("hasAnyRole('FARMER', 'ANALYST', 'ADMIN')")
+    public ResponseEntity<ApiResponse<List<FieldDto>>> getAll(
+            @RequestParam(required = false) Long farmId) {
+
+        return ResponseEntity.ok(
+                ApiResponse.ok(fieldService.findAll(farmId)));
     }
 
+    // View individual fields
     @GetMapping("/{id}")
-    public ResponseEntity<ApiResponse<FieldDto>> getById(@PathVariable Long id) {
-        return ResponseEntity.ok(ApiResponse.ok(fieldService.findById(id)));
+    @PreAuthorize("hasAnyRole('FARMER', 'ANALYST', 'ADMIN')")
+    public ResponseEntity<ApiResponse<FieldDto>> getById(
+            @PathVariable Long id) {
+
+        return ResponseEntity.ok(
+                ApiResponse.ok(fieldService.findById(id)));
     }
 
+    // Create fields
     @PostMapping
-    public ResponseEntity<ApiResponse<FieldDto>> create(@Valid @RequestBody FieldDto dto) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.ok("Field created", fieldService.create(dto)));
+    @PreAuthorize("hasAnyRole('FARMER', 'ADMIN')")
+    public ResponseEntity<ApiResponse<FieldDto>> create(
+            @Valid @RequestBody FieldDto dto) {
+
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.ok(
+                        "Field created",
+                        fieldService.create(dto)));
     }
 
+    // Update fields
     @PutMapping("/{id}")
-    public ResponseEntity<ApiResponse<FieldDto>> update(@PathVariable Long id, @Valid @RequestBody FieldDto dto) {
-        return ResponseEntity.ok(ApiResponse.ok("Field updated", fieldService.update(id, dto)));
+    @PreAuthorize("hasAnyRole('FARMER', 'ADMIN')")
+    public ResponseEntity<ApiResponse<FieldDto>> update(
+            @PathVariable Long id,
+            @Valid @RequestBody FieldDto dto) {
+
+        return ResponseEntity.ok(
+                ApiResponse.ok(
+                        "Field updated",
+                        fieldService.update(id, dto)));
     }
 
+    // Delete fields
     @DeleteMapping("/{id}")
-    public ResponseEntity<ApiResponse<MessageResponse>> delete(@PathVariable Long id) {
+    @PreAuthorize("hasAnyRole('FARMER', 'ADMIN')")
+    public ResponseEntity<ApiResponse<MessageResponse>> delete(
+            @PathVariable Long id) {
+
         fieldService.delete(id);
-        return ResponseEntity.ok(ApiResponse.ok(new MessageResponse("Field deleted")));
+
+        return ResponseEntity.ok(
+                ApiResponse.ok(new MessageResponse("Field deleted")));
     }
 }

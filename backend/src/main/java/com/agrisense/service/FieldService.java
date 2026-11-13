@@ -1,12 +1,16 @@
+
 package com.agrisense.service;
 
 import com.agrisense.dto.FieldDto;
 import com.agrisense.entity.Farm;
 import com.agrisense.entity.Field;
 import com.agrisense.entity.FieldStatus;
+import com.agrisense.entity.Role;
+import com.agrisense.entity.User;
 import com.agrisense.exception.ResourceNotFoundException;
 import com.agrisense.repository.FieldRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,23 +26,41 @@ public class FieldService {
 
     @Transactional(readOnly = true)
     public List<FieldDto> findAll(Long farmId) {
+        User user = currentUserService.getCurrentUser();
+
         if (farmId != null) {
-            farmService.getOwnedFarm(farmId);
-            return fieldRepository.findByFarmId(farmId).stream().map(this::toDto).toList();
+            farmService.getAccessibleFarm(farmId);
+
+            return fieldRepository.findByFarmId(farmId).stream()
+                    .map(this::toDto)
+                    .toList();
         }
-        return fieldRepository.findByFarmUserId(currentUserService.getCurrentUserId()).stream()
+
+        List<Field> fields;
+
+        if (user.getRole() == Role.ANALYST || user.getRole() == Role.ADMIN) {
+            fields = fieldRepository.findAll();
+        } else {
+            fields = fieldRepository.findByFarmUserId(user.getId());
+        }
+
+        return fields.stream()
                 .map(this::toDto)
                 .toList();
     }
 
     @Transactional(readOnly = true)
     public FieldDto findById(Long id) {
-        return toDto(getOwnedField(id));
+        return toDto(getAccessibleField(id));
     }
 
     @Transactional
     public FieldDto create(FieldDto dto) {
+        User user = currentUserService.getCurrentUser();
+        ensureFieldManagementAllowed(user);
+
         Farm farm = farmService.getOwnedFarm(dto.getFarmId());
+
         Field field = Field.builder()
                 .name(dto.getName())
                 .areaAcres(dto.getAreaAcres())
@@ -48,40 +70,77 @@ public class FieldService {
                 .longitude(dto.getLongitude())
                 .farm(farm)
                 .build();
+
         return toDto(fieldRepository.save(field));
     }
 
     @Transactional
     public FieldDto update(Long id, FieldDto dto) {
+        User user = currentUserService.getCurrentUser();
+        ensureFieldManagementAllowed(user);
+
         Field field = getOwnedField(id);
-        if (dto.getFarmId() != null && !dto.getFarmId().equals(field.getFarm().getId())) {
+
+        if (dto.getFarmId() != null
+                && !dto.getFarmId().equals(field.getFarm().getId())) {
+
             Farm farm = farmService.getOwnedFarm(dto.getFarmId());
             field.setFarm(farm);
         }
+
         field.setName(dto.getName());
         field.setAreaAcres(dto.getAreaAcres());
         field.setCropType(dto.getCropType());
+
         if (dto.getStatus() != null) {
             field.setStatus(dto.getStatus());
         }
+
         field.setLatitude(dto.getLatitude());
         field.setLongitude(dto.getLongitude());
+
         return toDto(fieldRepository.save(field));
     }
 
     @Transactional
     public void delete(Long id) {
+        User user = currentUserService.getCurrentUser();
+        ensureFieldManagementAllowed(user);
+
         fieldRepository.delete(getOwnedField(id));
     }
 
+    @Transactional(readOnly = true)
+    public Field getAccessibleField(Long id) {
+        User user = currentUserService.getCurrentUser();
+
+        if (user.getRole() == Role.ANALYST || user.getRole() == Role.ADMIN) {
+            return fieldRepository.findById(id)
+                    .orElseThrow(() -> new ResourceNotFoundException("Field", id));
+        }
+
+        return getOwnedField(id);
+    }
+
+    @Transactional(readOnly = true)
     public Field getOwnedField(Long id) {
         Field field = fieldRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Field", id));
-        Long currentUserId = currentUserService.getCurrentUserId();
-        if (!field.getFarm().getUser().getId().equals(currentUserId)) {
+
+        User user = currentUserService.getCurrentUser();
+
+        if (!field.getFarm().getUser().getId().equals(user.getId())
+                && user.getRole() != Role.ADMIN) {
             throw new ResourceNotFoundException("Field", id);
         }
+
         return field;
+    }
+
+    private void ensureFieldManagementAllowed(User user) {
+        if (user.getRole() == Role.ANALYST) {
+            throw new AccessDeniedException("Analysts cannot manage fields");
+        }
     }
 
     private FieldDto toDto(Field field) {

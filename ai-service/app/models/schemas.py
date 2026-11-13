@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from datetime import date
+from typing import Literal
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -14,14 +15,30 @@ class CropRecord(BaseModel):
     farm_id: str = Field(..., min_length=1)
     plot_id: str = Field(..., min_length=1)
     crop: str = Field(..., min_length=1)
+    crop_variety: str | None = None
     season: str = Field(..., min_length=1)
     soil_type: str = Field(..., min_length=1)
+    weather_condition: str | None = None
+
+    # The numeric area is supplied in area_source_unit.
+    # It will be converted to hectares during processing.
     area_hectares: float = Field(..., gt=0)
+    area_source_unit: Literal["hectares", "acres"] = "hectares"
+
     sowing_date: date
     harvest_date: date | None = None
+    harvest_weight_kg: float | None = Field(default=None, ge=0)
+
+    # Input quantities are converted to canonical units during processing.
     fertilizer_kg: float = Field(..., ge=0)
+    fertilizer_source_unit: Literal["kg", "g", "tonnes"] = "kg"
+
     seed_kg: float = Field(..., ge=0)
+    seed_source_unit: Literal["kg", "g", "tonnes"] = "kg"
+
     water_liters: float = Field(..., ge=0)
+    water_source_unit: Literal["liters", "milliliters", "cubic_meters"] = "liters"
+
     yield_tonnes_ha: float | None = Field(default=None, ge=0)
 
     @model_validator(mode="after")
