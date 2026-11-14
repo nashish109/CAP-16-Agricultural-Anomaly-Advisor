@@ -1,9 +1,15 @@
+
 import { Navigate, Outlet } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { Skeleton } from '../components/ui'
+import { canAccessRoute } from '../config/permissions'
 
-export default function ProtectedRoute() {
-  const { isAuthenticated, isLoading } = useAuth()
+interface ProtectedRouteProps {
+  path?: string
+}
+
+export default function ProtectedRoute({ path }: ProtectedRouteProps) {
+  const { user, isAuthenticated, isLoading } = useAuth()
 
   if (isLoading) {
     return (
@@ -19,6 +25,20 @@ export default function ProtectedRoute() {
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />
+  }
+
+  if (path && !canAccessRoute(user?.role, path)) {
+    const canAccessDashboard = canAccessRoute(
+      user?.role,
+      '/dashboard'
+    )
+
+    return (
+      <Navigate
+        to={canAccessDashboard ? '/dashboard' : '/'}
+        replace
+      />
+    )
   }
 
   return <Outlet />

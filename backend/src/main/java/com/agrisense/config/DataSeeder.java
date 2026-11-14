@@ -78,7 +78,7 @@ public class DataSeeder implements CommandLineRunner {
                 .fullName("Pugalini")
                 .phone("+94 77 123 4567")
                 .location("Jaffna, Sri Lanka")
-                .role(Role.USER)
+                .role(Role.FARMER)
                 .build());
 
         Farm farm1 = farmRepository.save(Farm.builder()

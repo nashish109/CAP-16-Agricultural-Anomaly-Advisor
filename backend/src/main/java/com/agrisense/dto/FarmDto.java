@@ -1,28 +1,80 @@
+
 package com.agrisense.dto;
 
-import jakarta.validation.constraints.NotBlank;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import com.agrisense.entity.AreaUnit;
 
-@Data
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
 public class FarmDto {
 
     private Long id;
-
-    @NotBlank
     private String name;
-
     private String location;
+
+    // Legacy-compatible area input/output.
     private Double areaAcres;
-    private Double latitude;
-    private Double longitude;
-    private String description;
-    private Long userId;
-    private Integer fieldCount;
-    private Integer cropCount;
+
+    // New area input.
+    private Double areaValue;
+    private AreaUnit areaUnit;
+
+    // Additional representation for responses.
+    private Double areaHectares;
+
+    public FarmDto() {
+    }
+
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public String getLocation() {
+        return location;
+    }
+
+    public void setLocation(String location) {
+        this.location = location;
+    }
+
+    public Double getAreaAcres() {
+        return areaAcres;
+    }
+
+    public void setAreaAcres(Double areaAcres) {
+        this.areaAcres = areaAcres;
+    }
+
+    public Double getAreaValue() {
+        return areaValue;
+    }
+
+    public void setAreaValue(Double areaValue) {
+        this.areaValue = areaValue;
+    }
+
+    public AreaUnit getAreaUnit() {
+        return areaUnit;
+    }
+
+    public void setAreaUnit(AreaUnit areaUnit) {
+        this.areaUnit = areaUnit;
+    }
+
+    public Double getAreaHectares() {
+        return areaHectares;
+    }
+
+    public void setAreaHectares(Double areaHectares) {
+        this.areaHectares = areaHectares;
+    }
 }

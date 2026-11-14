@@ -1,6 +1,9 @@
+
 package com.agrisense.entity;
 
 public enum Role {
-    USER,
-    ADMIN
+    FARMER,
+    ANALYST,
+    ADMIN,
+    USER    
 }

@@ -40,7 +40,7 @@ public class AuthService {
                 .fullName(request.getFullName())
                 .phone(request.getPhone())
                 .location(request.getLocation())
-                .role(Role.USER)
+                .role(Role.FARMER)
                 .build();
 
         userRepository.save(user);

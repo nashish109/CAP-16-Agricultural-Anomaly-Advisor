@@ -1,5 +1,6 @@
 
 import { NavLink, useNavigate } from 'react-router-dom'
+import { canAccessRoute } from '../config/permissions'
 import {
   LayoutDashboard,
   MapPinned,
@@ -39,9 +40,16 @@ const navGroups = [
   {
     label: 'CROP INTELLIGENCE',
     items: [
-      { to: '/crop-input-analysis', label: 'Crop Input Analysis', icon: Sprout },
-      { to: '/comparable-plots', label: 'Comparable Plot Analysis', icon: GitCompareArrows },
-      { to: '/crop-predictions', label: 'Yield Anomaly Advisor', icon: ChartNoAxesCombined },
+      {
+        to: '/crop-predictions',
+        label: 'Yield Anomaly Advisor',
+        icon: ChartNoAxesCombined,
+      },
+      {
+        to: '/comparable-plots',
+        label: 'Comparable Plot Analysis',
+        icon: GitCompareArrows,
+      },
     ],
   },
   {
@@ -69,6 +77,15 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
   const navigate = useNavigate()
   const alertCount = useAlertCount()
 
+  const visibleNavGroups = navGroups
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) =>
+        canAccessRoute(user?.role, item.to)
+      ),
+    }))
+    .filter((group) => group.items.length > 0)
+
   const handleLogout = () => {
     logout()
     navigate('/')
@@ -76,7 +93,9 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
 
   const displayName = (() => {
     const parts = user?.fullName?.trim().split(/\s+/) || []
-    if (parts.length >= 2) return `${parts[0]} ${parts[parts.length - 1].charAt(0)}.`
+    if (parts.length >= 2) {
+      return `${parts[0]} ${parts[parts.length - 1].charAt(0)}.`
+    }
     return parts[0] || 'Farmer'
   })()
 
@@ -103,8 +122,11 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-600 shadow-sm">
               <Leaf className="h-[18px] w-[18px] text-white" />
             </div>
+
             <div>
-              <p className="text-[15px] font-semibold tracking-tight">CAP-16</p>
+              <p className="text-[15px] font-semibold tracking-tight">
+                CAP-16
+              </p>
               <p className="text-[11px] font-medium text-white/45">
                 Crop Intelligence Advisor
               </p>
@@ -143,9 +165,11 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
             </NavLink>
           </div>
 
-          {navGroups.map((group) => (
+          {visibleNavGroups.map((group) => (
             <div key={group.label}>
-              <p className="section-label mb-2 px-3">{group.label}</p>
+              <p className="section-label mb-2 px-3">
+                {group.label}
+              </p>
 
               <div className="space-y-0.5">
                 {group.items.map(({ to, label, icon: Icon, badge }) => (
@@ -165,6 +189,7 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
                       className="h-[17px] w-[17px] shrink-0 opacity-90"
                       strokeWidth={1.75}
                     />
+
                     <span className="flex-1">{label}</span>
 
                     {badge && alertCount > 0 && (
@@ -186,8 +211,14 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
             </div>
 
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium">{displayName}</p>
-              <p className="truncate text-[11px] text-white/45">Farmer</p>
+              <p className="truncate text-sm font-medium">
+                {displayName}
+              </p>
+              <p className="truncate text-[11px] text-white/45">
+                {user?.role
+                  ? user.role.charAt(0) + user.role.slice(1).toLowerCase()
+                  : 'User'}
+              </p>
             </div>
           </div>
 

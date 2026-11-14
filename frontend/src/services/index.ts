@@ -10,6 +10,11 @@ import type {
   MarketPrice,
   Alert,
   DashboardStats,
+  DashboardAnalytics,
+  AnomalyBatch,
+  AnomalyAssessment,
+  AnomalyRecommendation,
+  ComparablePlotRow,
   DiseaseDetectionResult,
   YieldPredictionResult,
   IrrigationRecommendation,
@@ -27,6 +32,7 @@ function dayLabel(dateStr: string, index: number): string {
 
 function mapWeather(raw: Record<string, unknown>): WeatherResponse {
   const forecastRaw = (raw.forecast as Record<string, unknown>[]) || []
+
   const mapDay = (d: Record<string, unknown>, i: number): WeatherDay => ({
     date: String(d.forecastDate || d.date || ''),
     dayLabel: String(d.dayLabel || dayLabel(String(d.forecastDate || d.date || ''), i)),
@@ -43,8 +49,7 @@ function mapWeather(raw: Record<string, unknown>): WeatherResponse {
   const forecast = forecastRaw.map(mapDay)
   const current = raw.current
     ? mapDay(raw.current as Record<string, unknown>, 0)
-    : forecast[0] ||
-      mapDay(raw, 0)
+    : forecast[0] || mapDay(raw, 0)
 
   return {
     location: String(raw.location || 'Jaffna, Sri Lanka'),
@@ -63,6 +68,7 @@ function mapAuth(raw: Record<string, unknown>): AuthResponse {
       user: raw.user as User,
     }
   }
+
   return {
     token: String(raw.token),
     type: 'Bearer',
@@ -96,6 +102,7 @@ function mapDashboard(raw: Record<string, unknown>): DashboardStats {
 function mapDisease(raw: Record<string, unknown>): DiseaseDetectionResult {
   const recs = (raw.recommendations as string[]) || []
   const confidenceRaw = Number(raw.confidence ?? 0.9)
+
   return {
     crop: String(raw.crop || raw.cropName || 'Tomato'),
     disease: String(raw.disease || 'Unknown'),
@@ -113,15 +120,21 @@ function mapDisease(raw: Record<string, unknown>): DiseaseDetectionResult {
 function mapYield(raw: Record<string, unknown>): YieldPredictionResult {
   const factorsRaw = raw.factors
   let factors: { name: string; impact: string }[] = []
+
   if (Array.isArray(factorsRaw)) {
     factors = factorsRaw.map((f) =>
       typeof f === 'string'
         ? { name: f, impact: 'Influential' }
-        : { name: String((f as { name?: string }).name || f), impact: String((f as { impact?: string }).impact || 'Influential') }
+        : {
+            name: String((f as { name?: string }).name || f),
+            impact: String((f as { impact?: string }).impact || 'Influential'),
+          }
     )
   }
+
   const confidenceRaw = Number(raw.confidence ?? 0.85)
   const predicted = Number(raw.predictedYield ?? 4.2)
+
   const historical =
     (raw.historical as { season: string; yield: number }[]) ||
     [
@@ -163,6 +176,7 @@ export const authService = {
     const { data } = await api.post('/auth/login', { email, password })
     return mapAuth(data as Record<string, unknown>)
   },
+
   register: async (payload: {
     fullName: string
     email: string
@@ -179,6 +193,12 @@ export const dashboardService = {
   getStats: async () => {
     const { data } = await api.get('/dashboard/stats')
     return mapDashboard(data as Record<string, unknown>)
+  },
+
+  // CAP-16: Retrieve Snowflake-backed agricultural analytics.
+  getAnalytics: async (): Promise<DashboardAnalytics> => {
+    const { data } = await api.get<DashboardAnalytics>('/dashboard/analytics')
+    return data
   },
 }
 
@@ -210,13 +230,16 @@ export const cropService = {
 export const sensorService = {
   getReadings: (fieldId: number) =>
     api.get<SensorReading[]>(`/sensors/${fieldId}/readings`).then((r) => r.data),
+
   getLatest: async (fieldId: number) => {
     const readings = await api.get<SensorReading[]>(`/sensors/${fieldId}/readings`).then((r) => r.data)
     const latest: Record<string, number> = {}
+
     readings.forEach((reading) => {
       const key = reading.sensorType
       if (!(key in latest)) latest[key] = reading.value
     })
+
     return latest
   },
 }
@@ -232,8 +255,45 @@ export const marketService = {
   getPrices: () => api.get<MarketPrice[]>('/market-prices').then((r) => r.data),
 }
 
+// Existing PostgreSQL operational notifications.
 export const alertService = {
   getAll: () => api.get<Alert[]>('/alerts').then((r) => r.data),
+}
+
+// CAP-16: Snowflake-backed agricultural anomaly assessments and recommendations.
+export const anomalyService = {
+  getBatches: async (): Promise<AnomalyBatch[]> => {
+    const { data } = await api.get('/anomalies/batches')
+    return data.data
+  },
+
+  getAssessments: async (
+    batchId?: string
+  ): Promise<AnomalyAssessment[]> => {
+    const { data } = await api.get('/anomalies/assessments', {
+      params: batchId ? { batchId } : {},
+    })
+
+    return data.data
+  },
+
+  getRecommendations: async (
+    batchId?: string
+  ): Promise<AnomalyRecommendation[]> => {
+    const { data } = await api.get('/anomalies/recommendations', {
+      params: batchId ? { batchId } : {},
+    })
+
+    return data.data
+  },
+
+  getComparablePlots: async (batchId: string): Promise<ComparablePlotRow[]> => {
+    const { data } = await api.get('/anomalies/comparable-plots', {
+      params: { batchId },
+    })
+
+    return data.data
+  },
 }
 
 export const diseaseService = {
@@ -241,7 +301,8 @@ export const diseaseService = {
     const form = new FormData()
     form.append('image', file)
     if (fieldId) form.append('fieldId', String(fieldId))
-    // Do not set Content-Type — browser must add multipart boundary
+
+    // Do not set Content-Type — browser must add multipart boundary.
     const { data } = await api.post('/disease-detection', form)
     return mapDisease(data as Record<string, unknown>)
   },
@@ -267,6 +328,7 @@ export const yieldService = {
       rainfall: payload.rainfall,
       soilType: payload.soilPh != null ? `pH ${payload.soilPh}` : undefined,
     })
+
     return mapYield(data as Record<string, unknown>)
   },
 }
@@ -276,6 +338,7 @@ export const irrigationService = {
     const { data } = await api.get('/irrigation/recommendation', { params: { fieldId } })
     return mapIrrigation(data as Record<string, unknown>)
   },
+
   start: (fieldId: number, durationMinutes: number) =>
     api.post('/irrigation/start', { fieldId, durationMinutes }).then((r) => r.data),
 }

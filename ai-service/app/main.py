@@ -1,4 +1,5 @@
-﻿"""CAP-16 Agricultural Data Processing Service."""
+﻿
+"""CAP-16 Agricultural Data Processing Service."""
 
 from __future__ import annotations
 
@@ -9,6 +10,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.routes.agricultural import router as agricultural_router
+from app.routes.anomalies import router as anomalies_router
+from app.routes.dashboard import router as dashboard_router
+from app.routes.quality import router as quality_router
 
 logging.basicConfig(
     level=os.getenv("LOG_LEVEL", "INFO").upper(),
@@ -21,7 +25,8 @@ app = FastAPI(
     title="CAP-16 Agricultural Data Processing Service",
     description=(
         "Processes agricultural crop input and yield records "
-        "for data quality checks and yield anomaly analysis."
+        "for data quality checks, independent-plot yield anomaly "
+        "analysis, anomaly assessments and dashboard analytics."
     ),
     version="1.0.0",
 )
@@ -39,7 +44,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Register API routers
 app.include_router(agricultural_router)
+app.include_router(dashboard_router)
+app.include_router(quality_router)
+app.include_router(anomalies_router)
 
 
 @app.get("/health", tags=["health"])
