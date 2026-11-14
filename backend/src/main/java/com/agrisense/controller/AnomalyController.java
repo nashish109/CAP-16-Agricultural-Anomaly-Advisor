@@ -1,4 +1,3 @@
-
 package com.agrisense.controller;
 
 import com.agrisense.dto.ApiResponse;
@@ -32,6 +31,28 @@ public class AnomalyController {
         return ResponseEntity.ok(
                 ApiResponse.ok(
                         anomalyAnalyticsService.getAssessments(batchId)
+                )
+        );
+    }
+
+    @GetMapping("/recommendations")
+    public ResponseEntity<ApiResponse<JsonNode>> recommendations(
+            @RequestParam(required = false) String batchId
+    ) {
+        return ResponseEntity.ok(
+                ApiResponse.ok(
+                        anomalyAnalyticsService.getRecommendations(batchId)
+                )
+        );
+    }
+
+    @GetMapping("/comparable-plots")
+    public ResponseEntity<ApiResponse<JsonNode>> comparablePlots(
+            @RequestParam String batchId
+    ) {
+        return ResponseEntity.ok(
+                ApiResponse.ok(
+                        anomalyAnalyticsService.getComparablePlots(batchId)
                 )
         );
     }

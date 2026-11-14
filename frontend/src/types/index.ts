@@ -1,4 +1,3 @@
-
 export type FieldStatus = 'HEALTHY' | 'MODERATE' | 'ATTENTION'
 export type AlertSeverity = 'CRITICAL' | 'WARNING' | 'INFO' | 'SUCCESS'
 export type IrrigationStatus = 'PENDING' | 'RUNNING' | 'COMPLETED'
@@ -105,7 +104,6 @@ export interface Alert {
   timestamp: string
 }
 
-
 // CAP-16: Snowflake-backed anomaly assessments
 
 export interface AnomalyBatch {
@@ -148,6 +146,36 @@ export interface AnomalyAssessmentResponse {
   batch_id: string | null
   total_assessments: number
   data: AnomalyAssessment[]
+}
+
+// CAP-16: Contextual agricultural recommendations
+
+export interface AnomalyRecommendation {
+  anomaly_id: string | null
+  batch_id: string | null
+  record_id: string | null
+  farm_id: string | null
+  plot_id: string
+  crop: string
+  anomaly_type: string
+  metric_name: string
+  observed_value: number | null
+  expected_value: number | null
+  deviation_percentage: number | null
+  priority: string
+  title: string
+  recommendation: string
+  suggested_actions: string[]
+  rationale: string
+  advisory_note: string
+}
+
+export interface AnomalyRecommendationResponse {
+  success: boolean
+  role: string
+  batch_id: string | null
+  total_recommendations: number
+  data: AnomalyRecommendation[]
 }
 
 export interface DashboardStats {
@@ -268,4 +296,71 @@ export interface IrrigationRecommendation {
 export interface ApiError {
   message: string
   status?: number
+}
+
+export type AreaUnit = "ACRES" | "HECTARES";
+
+export interface Farm {
+  id: number;
+  name: string;
+  location: string;
+  areaAcres: number;
+  areaHectares?: number;
+}
+
+export interface FarmRequest {
+  name: string;
+  location: string;
+  areaValue: number;
+  areaUnit: AreaUnit;
+}
+
+export interface Field {
+  id: number;
+  name: string;
+  farmId: number;
+  areaAcres: number;
+  areaHectares?: number;
+}
+
+export interface FieldRequest {
+  name: string;
+  farmId: number;
+  areaValue: number;
+  areaUnit: AreaUnit;
+}
+
+// CAP-16: Independent comparable-plot observations and peer benchmarks.
+export interface ComparablePlotRow {
+  batch_id: string
+  record_id: string
+  farm_id: string | null
+  plot_id: string | null
+  crop: string
+  crop_variety: string | null
+  season: string
+  soil_type: string
+  target_fertilizer_value: number | null
+  target_water_value: number | null
+  target_yield_value: number | null
+  peer_plot_count: number
+  fertilizer_peer_count: number
+  water_peer_count: number
+  yield_peer_count: number
+  median_fertilizer: number | null
+  median_water: number | null
+  median_yield: number | null
+  peer_farm_id: string | null
+  peer_plot_id: string | null
+  peer_fertilizer_value: number | null
+  peer_water_value: number | null
+  peer_yield_value: number | null
+}
+
+export interface ComparablePlotAnalysisResponse {
+  success: boolean
+  role: string
+  batch_id: string
+  total_target_records: number
+  data: ComparablePlotRow[]
 }

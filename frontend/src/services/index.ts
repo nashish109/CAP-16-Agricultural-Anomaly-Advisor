@@ -1,4 +1,3 @@
-
 import { api } from './api'
 import type {
   AuthResponse,
@@ -14,6 +13,8 @@ import type {
   DashboardAnalytics,
   AnomalyBatch,
   AnomalyAssessment,
+  AnomalyRecommendation,
+  ComparablePlotRow,
   DiseaseDetectionResult,
   YieldPredictionResult,
   IrrigationRecommendation,
@@ -31,6 +32,7 @@ function dayLabel(dateStr: string, index: number): string {
 
 function mapWeather(raw: Record<string, unknown>): WeatherResponse {
   const forecastRaw = (raw.forecast as Record<string, unknown>[]) || []
+
   const mapDay = (d: Record<string, unknown>, i: number): WeatherDay => ({
     date: String(d.forecastDate || d.date || ''),
     dayLabel: String(d.dayLabel || dayLabel(String(d.forecastDate || d.date || ''), i)),
@@ -258,7 +260,7 @@ export const alertService = {
   getAll: () => api.get<Alert[]>('/alerts').then((r) => r.data),
 }
 
-// CAP-16: Snowflake-backed agricultural anomaly assessments.
+// CAP-16: Snowflake-backed agricultural anomaly assessments and recommendations.
 export const anomalyService = {
   getBatches: async (): Promise<AnomalyBatch[]> => {
     const { data } = await api.get('/anomalies/batches')
@@ -274,6 +276,24 @@ export const anomalyService = {
 
     return data.data
   },
+
+  getRecommendations: async (
+    batchId?: string
+  ): Promise<AnomalyRecommendation[]> => {
+    const { data } = await api.get('/anomalies/recommendations', {
+      params: batchId ? { batchId } : {},
+    })
+
+    return data.data
+  },
+
+  getComparablePlots: async (batchId: string): Promise<ComparablePlotRow[]> => {
+    const { data } = await api.get('/anomalies/comparable-plots', {
+      params: { batchId },
+    })
+
+    return data.data
+  },
 }
 
 export const diseaseService = {
@@ -282,7 +302,7 @@ export const diseaseService = {
     form.append('image', file)
     if (fieldId) form.append('fieldId', String(fieldId))
 
-    // Do not set Content-Type — browser must add multipart boundary
+    // Do not set Content-Type — browser must add multipart boundary.
     const { data } = await api.post('/disease-detection', form)
     return mapDisease(data as Record<string, unknown>)
   },

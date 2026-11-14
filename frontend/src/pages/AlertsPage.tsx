@@ -29,6 +29,7 @@ import type {
   AlertSeverity,
   AnomalyAssessment,
   AnomalyBatch,
+  AnomalyRecommendation,
 } from '../types'
 
 const severityIcon = {
@@ -169,7 +170,7 @@ function AnomalyCard({ assessment }: { assessment: AnomalyAssessment }) {
             </div>
 
             <p className="mt-1 text-sm text-gray-600">
-              {assessment.crop} · Plot {assessment.plot_id || 'N/A'}
+              {assessment.crop} Â· Plot {assessment.plot_id || 'N/A'}
             </p>
           </div>
 
@@ -233,6 +234,107 @@ function AnomalyCard({ assessment }: { assessment: AnomalyAssessment }) {
   )
 }
 
+
+function RecommendationCard({
+  recommendation,
+}: {
+  recommendation: AnomalyRecommendation
+}) {
+  const priority = recommendation.priority?.toUpperCase() || 'INFO'
+  const tone =
+    priority === 'HIGH' || priority === 'CRITICAL'
+      ? 'danger'
+      : priority === 'MEDIUM' || priority === 'WARNING'
+        ? 'warning'
+        : 'info'
+
+  return (
+    <Card className="border border-brand-100 bg-brand-50/30">
+      <div className="space-y-3">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="font-semibold text-gray-900">
+                {recommendation.title}
+              </h3>
+              <Badge tone={tone}>{priority} PRIORITY</Badge>
+              <Badge tone="info">
+                {recommendation.anomaly_type.replaceAll('_', ' ')}
+              </Badge>
+            </div>
+            <p className="mt-1 text-sm text-gray-600">
+              {recommendation.crop} · Plot {recommendation.plot_id || 'N/A'}
+            </p>
+          </div>
+        </div>
+
+        <p className="text-sm leading-relaxed text-gray-700">
+          {recommendation.recommendation}
+        </p>
+
+        {recommendation.observed_value != null && (
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            <div className="rounded-lg bg-white/80 p-3">
+              <p className="text-xs text-gray-500">Observed</p>
+              <p className="mt-1 font-semibold text-gray-900">
+                {formatMetric(
+                  recommendation.observed_value,
+                  getMetricUnit(recommendation.metric_name)
+                )}
+              </p>
+            </div>
+            <div className="rounded-lg bg-white/80 p-3">
+              <p className="text-xs text-gray-500">Peer median</p>
+              <p className="mt-1 font-semibold text-gray-900">
+                {formatMetric(
+                  recommendation.expected_value,
+                  getMetricUnit(recommendation.metric_name)
+                )}
+              </p>
+            </div>
+            <div className="rounded-lg bg-white/80 p-3">
+              <p className="text-xs text-gray-500">Deviation</p>
+              <p className="mt-1 font-semibold text-gray-900">
+                {formatMetric(recommendation.deviation_percentage, '%')}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {recommendation.suggested_actions.length > 0 && (
+          <div className="rounded-lg bg-white/80 p-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+              Suggested actions
+            </p>
+            <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-gray-700">
+              {recommendation.suggested_actions.map((action, index) => (
+                <li key={`${recommendation.anomaly_id || recommendation.batch_id}-${index}`}>
+                  {action}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {recommendation.rationale && (
+          <div className="rounded-lg bg-white/70 p-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+              Assessment rationale
+            </p>
+            <p className="mt-1 text-sm leading-relaxed text-gray-700">
+              {recommendation.rationale}
+            </p>
+          </div>
+        )}
+
+        <p className="text-xs leading-relaxed text-gray-500">
+          {recommendation.advisory_note}
+        </p>
+      </div>
+    </Card>
+  )
+}
+
 export default function AlertsPage() {
   const [alerts, setAlerts] = useState<Alert[]>([])
   const [alertSeverity, setAlertSeverity] = useState<AlertSeverity | 'ALL'>('ALL')
@@ -247,6 +349,10 @@ export default function AlertsPage() {
   const [assessments, setAssessments] = useState<AnomalyAssessment[]>([])
   const [assessmentLoading, setAssessmentLoading] = useState(true)
   const [assessmentError, setAssessmentError] = useState('')
+
+  const [recommendations, setRecommendations] = useState<AnomalyRecommendation[]>([])
+  const [recommendationLoading, setRecommendationLoading] = useState(true)
+  const [recommendationError, setRecommendationError] = useState('')
 
   // Load existing PostgreSQL operational alerts and Snowflake batch list.
   useEffect(() => {
@@ -307,6 +413,35 @@ export default function AlertsPage() {
       })
       .finally(() => {
         if (!cancelled) setAssessmentLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [selectedBatch])
+
+  // Retrieve contextual recommendations whenever the selected batch changes.
+  useEffect(() => {
+    let cancelled = false
+
+    setRecommendationLoading(true)
+    setRecommendationError('')
+    setRecommendations([])
+
+    anomalyService
+      .getRecommendations(selectedBatch || undefined)
+      .then((data) => {
+        if (!cancelled) setRecommendations(data)
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setRecommendationError(
+            'Unable to retrieve agricultural recommendations. Please try again.'
+          )
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setRecommendationLoading(false)
       })
 
     return () => {
@@ -384,7 +519,7 @@ export default function AlertsPage() {
               {batches.map((batch) => (
                 <option key={batch.batch_id} value={batch.batch_id}>
                   {batch.source_file_name || batch.batch_id}
-                  {' — '}
+                  {' â€” '}
                   {batch.total_records} records
                 </option>
               ))}
@@ -396,9 +531,9 @@ export default function AlertsPage() {
           <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm text-gray-600">
             <span className="font-medium">Selected dataset:</span>{' '}
             {selectedBatchDetails.source_file_name}
-            <span className="mx-2">·</span>
+            <span className="mx-2">Â·</span>
             {selectedBatchDetails.total_records} records
-            <span className="mx-2">·</span>
+            <span className="mx-2">Â·</span>
             {selectedBatchDetails.processing_status}
           </div>
         )}
@@ -543,6 +678,63 @@ export default function AlertsPage() {
             )}
           </>
         )}
+      </section>
+
+      {/* CAP-16 AGRICULTURAL RECOMMENDATIONS */}
+      <section className="space-y-5">
+        <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
+          <div>
+            <h2 className="text-xl font-semibold text-gray-900">
+              Agricultural Recommendations
+            </h2>
+            <p className="mt-1 text-sm text-gray-500">
+              Practical decision-support actions generated from persisted anomaly assessments.
+            </p>
+          </div>
+          <Badge tone="success">
+            {recommendations.length} recommendations
+          </Badge>
+        </div>
+
+        {recommendationError && (
+          <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+            {recommendationError}
+          </div>
+        )}
+
+        {recommendationLoading ? (
+          <div className="space-y-3">
+            {Array.from({ length: 3 }).map((_, index) => (
+              <Skeleton key={index} className="h-32" />
+            ))}
+          </div>
+        ) : recommendations.length === 0 ? (
+          <Card>
+            <EmptyState
+              title="No recommendations available"
+              description={
+                selectedBatch
+                  ? 'No recommendations were generated for this dataset batch.'
+                  : 'Recommendations will appear here when anomaly assessments are available.'
+              }
+            />
+          </Card>
+        ) : (
+          <div className="space-y-3">
+            {recommendations.map((recommendation, index) => (
+              <RecommendationCard
+                key={`${recommendation.anomaly_id || recommendation.batch_id || 'recommendation'}-${index}`}
+                recommendation={recommendation}
+              />
+            ))}
+          </div>
+        )}
+
+        <p className="text-xs text-gray-500">
+          Recommendations are decision-support guidance based on observed
+          comparisons. They do not establish causation or replace local
+          agronomic advice.
+        </p>
       </section>
 
       {/* EXISTING OPERATIONAL NOTIFICATIONS */}

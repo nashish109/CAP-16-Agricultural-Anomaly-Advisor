@@ -1,5 +1,4 @@
-﻿
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+﻿import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { ThemeProvider } from './context/ThemeContext'
 import { ToastProvider } from './context/ToastContext'
@@ -20,6 +19,7 @@ import CropPredictionsPage from './pages/CropPredictionsPage'
 import AlertsPage from './pages/AlertsPage'
 import ReportsPage from './pages/ReportsPage'
 import SettingsPage from './pages/SettingsPage'
+import ComparablePlotsPage from './pages/ComparablePlotsPage'
 
 function PublicOnly({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth()
@@ -93,6 +93,10 @@ export default function App() {
                   </Route>
 
                   {/* Crop intelligence */}
+                  <Route element={<ProtectedRoute path="/comparable-plots" />}>
+                    <Route path="comparable-plots" element={<ComparablePlotsPage />} />
+                  </Route>
+
                   <Route element={<ProtectedRoute path="/crop-predictions" />}>
                     <Route path="crop-predictions" element={<CropPredictionsPage />} />
                   </Route>

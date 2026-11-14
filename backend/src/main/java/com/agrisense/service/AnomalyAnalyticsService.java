@@ -1,4 +1,3 @@
-
 package com.agrisense.service;
 
 import com.agrisense.entity.Role;
@@ -40,7 +39,52 @@ public class AnomalyAnalyticsService {
         User currentUser = currentUserService.getCurrentUser();
         HttpHeaders headers = buildHeaders(currentUser);
 
-        String uri = aiServiceUrl + "/api/anomalies/assessments";
+        return executeGetWithOptionalBatch(
+                "/api/anomalies/assessments",
+                batchId,
+                headers,
+                "Anomaly assessment"
+        );
+    }
+
+    public JsonNode getRecommendations(String batchId) {
+        User currentUser = currentUserService.getCurrentUser();
+        HttpHeaders headers = buildHeaders(currentUser);
+
+        return executeGetWithOptionalBatch(
+                "/api/anomalies/recommendations",
+                batchId,
+                headers,
+                "Agricultural recommendation"
+        );
+    }
+
+    public JsonNode getComparablePlots(String batchId) {
+        if (batchId == null || batchId.isBlank()) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "A dataset batch ID is required."
+            );
+        }
+
+        User currentUser = currentUserService.getCurrentUser();
+        HttpHeaders headers = buildHeaders(currentUser);
+
+        return executeGetWithOptionalBatch(
+                "/api/anomalies/comparable-plots",
+                batchId,
+                headers,
+                "Comparable plot analysis"
+        );
+    }
+
+    private JsonNode executeGetWithOptionalBatch(
+            String endpoint,
+            String batchId,
+            HttpHeaders headers,
+            String operation
+    ) {
+        String uri = aiServiceUrl + endpoint;
 
         if (batchId != null && !batchId.isBlank()) {
             uri += "?batch_id={batchId}";
@@ -50,7 +94,7 @@ public class AnomalyAnalyticsService {
             RestClient.RequestHeadersUriSpec<?> request =
                     restClientBuilder.build().get();
 
-            return request
+            JsonNode response = request
                     .uri(
                             uri,
                             batchId != null && !batchId.isBlank()
@@ -63,22 +107,32 @@ public class AnomalyAnalyticsService {
                     .retrieve()
                     .body(JsonNode.class);
 
+            if (response == null) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_GATEWAY,
+                        "The " + operation.toLowerCase()
+                                + " service returned an empty response."
+                );
+            }
+
+            return response;
+
         } catch (RestClientResponseException exception) {
             throw new ResponseStatusException(
                     exception.getStatusCode(),
-                    "Anomaly assessment request failed: "
+                    operation + " request failed: "
                             + exception.getResponseBodyAsString(),
                     exception
             );
 
-        } catch (Exception exception) {
-            if (exception instanceof ResponseStatusException statusException) {
-                throw statusException;
-            }
+        } catch (ResponseStatusException exception) {
+            throw exception;
 
+        } catch (Exception exception) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_GATEWAY,
-                    "Unable to retrieve anomaly assessments.",
+                    "Unable to retrieve "
+                            + operation.toLowerCase() + "s.",
                     exception
             );
         }

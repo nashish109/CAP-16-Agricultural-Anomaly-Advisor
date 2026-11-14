@@ -15,6 +15,7 @@ export const ROUTE_PERMISSIONS: Record<string, AppRole[]> = {
 
   // Agricultural intelligence
   '/crop-predictions': ['FARMER', 'ANALYST', 'ADMIN'],
+  '/comparable-plots': ['FARMER', 'ANALYST', 'ADMIN'],
 
   // Analytics and reporting
   '/alerts': ['FARMER', 'ANALYST', 'ADMIN'],
